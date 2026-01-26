@@ -1,0 +1,117 @@
+# Model Comparison Configuration
+# ================================
+# Configuration for compare_models.py test harness
+#
+# Usage:
+#   python compare_models.py --config models.yaml --mode sequential
+#   python compare_models.py --config models.yaml --mode parallel
+
+# ============================================================================
+# Models to Test
+# ============================================================================
+models:
+  # -------------------------------------------------------------------------
+  # Seed-OSS-36B (Current Setup)
+  # -------------------------------------------------------------------------
+  - name: "Seed-OSS-36B"
+    api_url: "http://localhost:8000/v1"
+    model_id: "seed-oss"
+    context_limit: 131072  # 128K tokens
+    thinking_tag: "<seed:think>"
+    vllm_command: |
+      vllm serve Seed-OSS/Seed-OSS-36B-Instruct-AWQ \
+        --tensor-parallel-size 4 \
+        --max-model-len 131072 \
+        --gpu-memory-utilization 0.95 \
+        --enable-chunked-prefill \
+        --port 8000
+
+  # -------------------------------------------------------------------------
+  # GLM-4.7-Flash (Z.ai / Zhipu)
+  # -------------------------------------------------------------------------
+  - name: "GLM-4.7-Flash"
+    api_url: "http://localhost:8000/v1"
+    model_id: "glm-4.7-flash"
+    context_limit: 131072  # 128K tokens
+    thinking_tag: null  # Uses different thinking mechanism
+    vllm_command: |
+      vllm serve zai-org/GLM-4.7-Flash \
+        --tensor-parallel-size 4 \
+        --max-model-len 131072 \
+        --gpu-memory-utilization 0.95 \
+        --tool-call-parser glm47 \
+        --reasoning-parser glm45 \
+        --enable-auto-tool-choice \
+        --port 8000
+
+  # -------------------------------------------------------------------------
+  # Nemotron-3-Nano (NVIDIA)
+  # -------------------------------------------------------------------------
+  - name: "Nemotron-3-Nano"
+    api_url: "http://localhost:8000/v1"
+    model_id: "nemotron-3-nano"
+    context_limit: 1048576  # 1M tokens (!)
+    thinking_tag: null
+    vllm_command: |
+      vllm serve nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8 \
+        --tensor-parallel-size 4 \
+        --max-model-len 262144 \
+        --gpu-memory-utilization 0.95 \
+        --port 8000
+
+# ============================================================================
+# Test Configuration
+# ============================================================================
+tests:
+  # Standard benchmark (46 tests)
+  standard:
+    enabled: true
+    script: "benchmark.py"
+    categories:
+      - code
+      - reasoning
+      - knowledge
+      - tool_use
+      - speed
+      - context
+
+  # Practical debugging tests (your mining pool bugs)
+  practical:
+    enabled: true
+    scripts:
+      - "practical/zmq_test.py"
+      - "practical/pplns_test.py"
+      - "practical/expert_test.py"
+      - "practical/nightmare_test.py"
+      - "practical/hiveos_wrapper_test.py"
+
+  # Long context tests
+  long_context:
+    enabled: true
+    script: "long_context_test.py"
+    context_sizes:
+      - 32000    # 32K - baseline
+      - 64000    # 64K
+      - 128000   # 128K - Seed/GLM limit
+      - 256000   # 256K - only Nemotron
+      - 512000   # 512K - only Nemotron
+
+# ============================================================================
+# Output Configuration
+# ============================================================================
+output_dir: "./comparison_results"
+timeout: 600  # 10 minutes per test
+temperature: 0.0  # Deterministic for reproducibility
+
+# ============================================================================
+# Hardware Reference (for documentation)
+# ============================================================================
+# Your setup:
+#   - 6× RTX A4000 (16GB each = 96GB total)
+#   - H12D-8D: 4× PCIe 4.0 x16 slots
+#   - H11SSL: 4× PCIe 3.0 x16 + 2× PCIe 3.0 x8 slots
+#
+# Model VRAM requirements:
+#   - Seed-OSS-36B-AWQ: ~63GB (fits 4 cards)
+#   - GLM-4.7-Flash BF16: ~60GB (fits 4 cards)
+#   - Nemotron-3-Nano-FP8: ~32GB (fits 2-4 cards)
