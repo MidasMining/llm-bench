@@ -710,7 +710,7 @@ For each bug provide:
 - The fix
 ''',
         "checks": [
-            ("byte order / endianness", ["prev_hash", "reverse", "endian", "byte order", "little.endian", "[::-1]"]),
+            ("byte order / endianness", ["prev_hash", "reverse", "endian", "byte order", "little.endian", r"\[::-1\]"]),
             ("logging before submit / info leak", ["log", "before", "submit", "leak", "block_hex", "broadcast"]),
             ("race condition / stale", ["race", "stale", "job.*broadcast", "clean", "active_job"]),
             ("memory leak / pruning", ["ordereddict", "prune", "memory", "leak", "recent_shares", "never.*clean"]),
