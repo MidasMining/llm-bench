@@ -75,47 +75,63 @@ python compare_models.py --config models.yaml --quick
 
 ## Models Supported
 
-| Model | Context | Architecture | Notes |
-|-------|---------|--------------|-------|
-| Seed-OSS-36B | 128K | Dense Transformer | Current baseline |
-| GLM-4.7-Flash | 128K | MoE (30B/3B active) | Purpose-built for agentic coding |
-| Nemotron-3-Nano | 1M | Hybrid Mamba-MoE | Fastest throughput |
+| Model | Params | Active | Architecture | Quantization |
+|-------|--------|--------|--------------|--------------|
+| Seed-OSS-36B | 36B | 36B | Dense Transformer | AWQ INT4 |
+| GLM-4.7-Flash | 30B | ~3B | MoE + MLA | NVFP4 |
+| GPT-OSS-20B | 21B | 3.6B | MoE (32 experts) | MXFP4 |
+| Devstral-Small-24B | 24B | 24B | Mistral Dense | AWQ INT4 |
+| Qwen3-30B-A3B | 30B | 3B | MoE (128 experts) | AWQ INT4 |
+| Nemotron-3-Nano | 31.6B | 3.6B | Hybrid Mamba-MoE | FP8 |
 
 See `INSTALL_MODELS.md` for detailed installation instructions.
 
-## Example Output
+## Benchmark Results
 
-```
-========================================
-Testing: Seed-OSS-36B
-API: http://localhost:8000/v1
-========================================
+All benchmarks run on RTX 5090 (32GB GDDR7) with vLLM 0.14.0, temperature=0.0, max_tokens=8192, timeout=600s.
 
-Running: ZMQ Listener Bug (Easy)
-  PASS 1/1 found (15.2s, 1847 tokens)
-    [PASS] socket_thread_issue
-    [PASS] context_thread_safety
+### Score Summary
 
-Running: Stratum Protocol Bugs (Nightmare)
-  FAIL 3/5 found (45.3s, 6053 tokens)
-    [FAIL] byte_order
-    [FAIL] info_leak
-    [PASS] race_stale
-    [PASS] memory_leak
-    [PASS] input_validation
+| Model | ZMQ (2) | PPLNS (3) | Payment (4) | Stratum (5) | HiveOS (8) | **Total** | **Score** | **Throughput** |
+|-------|---------|-----------|-------------|-------------|------------|-----------|-----------|----------------|
+| **Seed-OSS-36B** | 2/2 | 3/3 | 4/4 | 5/5 | 8/8 | **22/22** | **100.0%** | 38.4 t/s |
+| **Qwen3-30B-A3B** | 2/2 | 3/3 | 4/4 | 5/5 | 8/8 | **22/22** | **100.0%** | 31.2 t/s |
+| Devstral-Small-24B | 2/2 | 3/3 | 4/4 | 4/5 | 8/8 | 21/22 | 95.5% | 53.6 t/s |
+| GLM-4.7-Flash | 0/2* | 3/3 | 0/4* | 0/5* | 8/8 | 11/22 | 50.0% | 4.4 t/s |
+| GPT-OSS-20B | 2/2 | 3/3 | 4/4 | 0/5** | 0/8** | 9/22 | 40.9% | 26.0 t/s |
+| Nemotron-3-Nano | - | - | - | - | - | N/A | OOM | N/A |
 
-----------------------------------------
-SUMMARY
-----------------------------------------
-  ZMQ Listener Bug                 PASS           1/1
-  PPLNS Mining Pool Bugs           PASS           3/3
-  Payment System Bugs              PASS           4/4
-  Stratum Protocol Bugs            FAIL           3/5
-  HiveOS Wrapper Creation          PASS           7/8
+\* = Timed out at 600s (model generates extensive thinking tokens before output)
+\*\* = 0 tokens returned (model error or timeout)
 
-  Total: 18/21 (85.7%)
-  Time: 156.3s
-```
+### Time Per Test (seconds)
+
+| Model | ZMQ | PPLNS | Payment | Stratum | HiveOS | **Total** |
+|-------|-----|-------|---------|---------|--------|-----------|
+| Devstral-Small-24B | 13.4 | 203.7 | 76.0 | 43.0 | 23.3 | **359** |
+| GPT-OSS-20B | 134.4 | 133.3 | 105.1 | 183.3 | 183.0 | **739** |
+| Qwen3-30B-A3B | 29.4 | 114.9 | 158.2 | 312.6 | 311.6 | **926** |
+| Seed-OSS-36B | 240.3 | 241.5 | 241.0 | 242.1 | 184.9 | **1150** |
+| GLM-4.7-Flash | 600* | 540.2 | 600* | 600* | 265.0 | **2605** |
+
+### Key Findings
+
+1. **Seed-OSS-36B** and **Qwen3-30B-A3B** both achieved perfect 100% scores, finding all bugs across all difficulty levels
+2. **Devstral-Small-24B** had the highest throughput (53.6 t/s) and near-perfect accuracy (95.5%), missing only the byte order/endianness check in the nightmare test
+3. **GLM-4.7-Flash** suffered from 600s timeouts on 3/5 tests due to extensive thinking token generation; the 2 tests that completed scored perfectly
+4. **GPT-OSS-20B** was fast and scored well on easy/medium tests but failed on the nightmare and HiveOS practical tests
+5. **Nemotron-3-Nano FP8** (30.52 GiB) could not fit on a single RTX 5090 (32 GB)
+
+### VRAM Usage
+
+| Model | Quantization | Model Size | VRAM Used | Fits 32GB? |
+|-------|-------------|------------|-----------|------------|
+| GPT-OSS-20B | MXFP4 | 12.9 GB | ~30 GB | Yes |
+| Devstral-Small-24B | Compressed Tensors | 15.2 GB | ~28 GB | Yes |
+| Qwen3-30B-A3B | AWQ INT4 | 16 GB | ~26 GB | Yes |
+| GLM-4.7-Flash | NVFP4 | 20 GB | ~31 GB | Yes |
+| Seed-OSS-36B | AWQ INT4 | 20 GB | ~30 GB | Yes |
+| Nemotron-3-Nano | FP8 | 30.5 GB | 30.5 GB | No (OOM) |
 
 ## Configuration
 
