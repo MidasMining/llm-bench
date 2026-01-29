@@ -88,9 +88,16 @@ See `INSTALL_MODELS.md` for detailed installation instructions.
 
 ## Benchmark Results
 
-All benchmarks run on RTX 5090 (32GB GDDR7) with vLLM 0.14.0, temperature=0.0, max_tokens=8192, timeout=600s.
+### Hardware Tested
 
-### Score Summary
+| GPU | VRAM | Architecture | Memory BW | Notes |
+|-----|------|--------------|-----------|-------|
+| RTX 5090 | 32GB GDDR7 | Blackwell (SM100) | 1792 GB/s | NVFP4/MXFP4 support |
+| Tesla V100 | 32GB HBM2 | Volta (SM70) | 900 GB/s | No FlashInfer, GPTQ native |
+
+All benchmarks run with vLLM 0.14.x, temperature=0.0, max_tokens=2048, timeout=600s.
+
+### Score Summary (RTX 5090)
 
 | Model | ZMQ (2) | PPLNS (3) | Payment (4) | Stratum (5) | HiveOS (8) | **Total** | **Score** | **Throughput** |
 |-------|---------|-----------|-------------|-------------|------------|-----------|-----------|----------------|
@@ -104,6 +111,14 @@ All benchmarks run on RTX 5090 (32GB GDDR7) with vLLM 0.14.0, temperature=0.0, m
 \* = Timed out at 600s (model generates extensive thinking tokens before output)
 \*\* = 0 tokens returned (model error or timeout)
 
+### Score Summary (Tesla V100 32GB)
+
+| Model | ZMQ (2) | PPLNS (3) | Payment (4) | Stratum (5) | HiveOS (8) | **Total** | **Score** | **Throughput** |
+|-------|---------|-----------|-------------|-------------|------------|-----------|-----------|----------------|
+| Seed-OSS-36B | 2/2 | 3/3 | 4/4 | 4/5 | 8/8 | 21/22 | 95.5% | 7.0 t/s |
+
+Note: V100 uses Triton attention backend (FlashInfer not supported on SM70). AWQ quantization falls back to Triton kernels.
+
 ### Time Per Test (seconds)
 
 | Model | ZMQ | PPLNS | Payment | Stratum | HiveOS | **Total** |
@@ -114,13 +129,34 @@ All benchmarks run on RTX 5090 (32GB GDDR7) with vLLM 0.14.0, temperature=0.0, m
 | Seed-OSS-36B | 240.3 | 241.5 | 241.0 | 242.1 | 184.9 | **1150** |
 | GLM-4.7-Flash | 600* | 540.2 | 600* | 600* | 265.0 | **2605** |
 
+### Parallel Throughput Scaling (V100 32GB)
+
+| Concurrency | Throughput | Per-Request | Success Rate |
+|-------------|------------|-------------|--------------|
+| 1 | 6.1 t/s | 6.1 t/s | 100% |
+| 2 | 10.7 t/s | 5.4 t/s | 100% |
+| 4 | 32.1 t/s | 8.0 t/s | 100% |
+| 8 | 57.0 t/s | 7.1 t/s | 100% |
+| **16** | **97.7 t/s** | 6.1 t/s | **100%** |
+| 32 | 74.7 t/s | 2.3 t/s | 44% (KV cache exhaustion) |
+
+Peak throughput on V100: **97.7 t/s @ concurrency 16** with long-form practical tests.
+
 ### Key Findings
 
+#### RTX 5090 (Blackwell)
 1. **Seed-OSS-36B** and **Qwen3-30B-A3B** both achieved perfect 100% scores, finding all bugs across all difficulty levels
 2. **Devstral-Small-24B** had the highest throughput (53.6 t/s) and near-perfect accuracy (95.5%), missing only the byte order/endianness check in the nightmare test
 3. **GLM-4.7-Flash** suffered from 600s timeouts on 3/5 tests due to extensive thinking token generation; the 2 tests that completed scored perfectly
 4. **GPT-OSS-20B** was fast and scored well on easy/medium tests but failed on the nightmare and HiveOS practical tests
 5. **Nemotron-3-Nano FP8** (30.52 GiB) could not fit on a single RTX 5090 (32 GB)
+
+#### Tesla V100 32GB (Volta)
+1. **Seed-OSS-36B AWQ** achieves 95.5% accuracy (21/22), missing only "memory leak/pruning" in Nightmare test
+2. Single-request throughput is **5.5x slower** than RTX 5090 (7 t/s vs 38 t/s) due to older architecture and Triton fallback kernels
+3. **Batching is critical**: throughput scales from 6 t/s (batch=1) to **97.7 t/s (batch=16)** — a 16x improvement
+4. KV cache becomes the bottleneck at concurrency 32 with long prompts (44% success rate)
+5. AWQ is **not officially supported** on Volta; GPTQ quantization has native CUDA kernel support and may perform better
 
 ### VRAM Usage
 
