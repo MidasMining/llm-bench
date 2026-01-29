@@ -113,11 +113,15 @@ All benchmarks run with vLLM 0.14.x, temperature=0.0, max_tokens=2048, timeout=6
 
 ### Score Summary (Tesla V100 32GB)
 
-| Model | ZMQ (2) | PPLNS (3) | Payment (4) | Stratum (5) | HiveOS (8) | **Total** | **Score** | **Throughput** |
-|-------|---------|-----------|-------------|-------------|------------|-----------|-----------|----------------|
-| Seed-OSS-36B | 2/2 | 3/3 | 4/4 | 4/5 | 8/8 | 21/22 | 95.5% | 7.0 t/s |
+| Model | Quant | ZMQ (2) | PPLNS (3) | Payment (4) | Stratum (5) | HiveOS (8) | **Total** | **Score** | **Throughput** |
+|-------|-------|---------|-----------|-------------|-------------|------------|-----------|-----------|----------------|
+| **Seed-OSS-36B** | **GPTQ** | 2/2 | 3/3 | 3/4 | **5/5** | 8/8 | 21/22 | **95.5%** | **48.3 t/s** |
+| Seed-OSS-36B | AWQ | 2/2 | 3/3 | 4/4 | 4/5 | 8/8 | 21/22 | 95.5% | 7.0 t/s |
 
-Note: V100 uses Triton attention backend (FlashInfer not supported on SM70). AWQ quantization falls back to Triton kernels.
+**Critical V100 Finding:** GPTQ is **6.9x faster** than AWQ on V100 due to native CUDA kernel support.
+- AWQ falls back to Triton kernels on Volta (not officially supported)
+- GPTQ has native CUDA kernels that work on SM70
+- Both achieve same accuracy but find different bugs (GPTQ nails the Nightmare test)
 
 ### Time Per Test (seconds)
 
@@ -131,16 +135,16 @@ Note: V100 uses Triton attention backend (FlashInfer not supported on SM70). AWQ
 
 ### Parallel Throughput Scaling (V100 32GB)
 
-| Concurrency | Throughput | Per-Request | Success Rate |
-|-------------|------------|-------------|--------------|
-| 1 | 6.1 t/s | 6.1 t/s | 100% |
-| 2 | 10.7 t/s | 5.4 t/s | 100% |
-| 4 | 32.1 t/s | 8.0 t/s | 100% |
-| 8 | 57.0 t/s | 7.1 t/s | 100% |
-| **16** | **97.7 t/s** | 6.1 t/s | **100%** |
-| 32 | 74.7 t/s | 2.3 t/s | 44% (KV cache exhaustion) |
+| Concurrency | GPTQ | AWQ | GPTQ Speedup |
+|-------------|------|-----|--------------|
+| 1 | **43.9 t/s** | 6.1 t/s | 7.2x |
+| 2 | **80.2 t/s** | 10.7 t/s | 7.5x |
+| 4 | **123.2 t/s** | 32.1 t/s | 3.8x |
+| 8 | **139.0 t/s** | 57.0 t/s | 2.4x |
+| 16 | **134.8 t/s** | 97.7 t/s | 1.4x |
+| 32 | 57.1 t/s (38%) | 74.7 t/s (44%) | KV exhaustion |
 
-Peak throughput on V100: **97.7 t/s @ concurrency 16** with long-form practical tests.
+Peak throughput on V100: **139.0 t/s @ concurrency 8** with GPTQ (vs 97.7 t/s with AWQ).
 
 ### Key Findings
 
@@ -152,11 +156,13 @@ Peak throughput on V100: **97.7 t/s @ concurrency 16** with long-form practical 
 5. **Nemotron-3-Nano FP8** (30.52 GiB) could not fit on a single RTX 5090 (32 GB)
 
 #### Tesla V100 32GB (Volta)
-1. **Seed-OSS-36B AWQ** achieves 95.5% accuracy (21/22), missing only "memory leak/pruning" in Nightmare test
-2. Single-request throughput is **5.5x slower** than RTX 5090 (7 t/s vs 38 t/s) due to older architecture and Triton fallback kernels
-3. **Batching is critical**: throughput scales from 6 t/s (batch=1) to **97.7 t/s (batch=16)** — a 16x improvement
-4. KV cache becomes the bottleneck at concurrency 32 with long prompts (44% success rate)
-5. AWQ is **not officially supported** on Volta; GPTQ quantization has native CUDA kernel support and may perform better
+1. **GPTQ is 7x faster than AWQ** on V100: 48.3 t/s vs 7.0 t/s sequential throughput
+2. Both quantizations achieve 95.5% accuracy but miss different bugs:
+   - AWQ misses "memory leak/pruning" (Nightmare)
+   - GPTQ misses "float precision" (Expert) but **nails the Nightmare test (5/5)**
+3. **Use GPTQ on V100**: Native CUDA kernels vs Triton fallback for AWQ
+4. Parallel scaling: GPTQ peaks at **139 t/s @ concurrency 8** (vs 97.7 t/s for AWQ @ 16)
+5. V100 with GPTQ approaches RTX 5090 AWQ performance (48 t/s vs 38 t/s sequential)
 
 ### VRAM Usage
 
