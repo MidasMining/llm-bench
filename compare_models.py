@@ -27,20 +27,29 @@ Date: January 2026
 """
 
 import argparse
+import asyncio
 import json
 import os
 import re
 import subprocess
 import sys
 import time
+import statistics
 import yaml
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 import requests
 
-VERSION = "2.0"
+# Async HTTP support for parallel tests
+try:
+    import aiohttp
+    ASYNC_AVAILABLE = True
+except ImportError:
+    ASYNC_AVAILABLE = False
+
+VERSION = "2.1"  # Added parallel benchmark support
 
 # ============================================================================
 # CONFIGURATION
@@ -62,7 +71,7 @@ DEFAULT_CONFIG = {
     },
     "settings": {
         "temperature": 0.0,
-        "max_tokens": 8192,
+        "max_tokens": 2048,  # Reduced for V100 speed (~4.7 tok/s)
         "timeout": 600,
     }
 }
@@ -798,7 +807,7 @@ Question: If you see this code:
 prev_hash = bytes.fromhex(template['previousblockhash'])
 ```
 What bug might this cause and how would you fix it?""",
-            "key_points": ["reverse", "[::-1]", "little-endian", "byte order", "endian"],
+            "key_points": ["reverse", r"\[::-1\]", "little-endian", "byte order", "endian"],
         },
     ]
 }
@@ -818,7 +827,7 @@ class TestResult:
     tokens_used: int = 0
     time_seconds: float = 0.0
 
-@dataclass 
+@dataclass
 class ModelResults:
     name: str
     api_url: str
@@ -829,6 +838,8 @@ class ModelResults:
     overall_score: float = 0.0
     throughput: float = 0.0
     tests: List[TestResult] = field(default_factory=list)
+    parallel_results: Dict[str, Any] = field(default_factory=dict)
+    gpu_info: Dict[str, Any] = field(default_factory=dict)
 
 
 def strip_thinking_tags(content: str) -> str:
@@ -844,13 +855,275 @@ def strip_thinking_tags(content: str) -> str:
     return content.strip()
 
 
-def call_model(api_url: str, model_id: str, prompt: str, 
+# ============================================================================
+# GPU DETECTION
+# ============================================================================
+
+def detect_gpu() -> Dict[str, Any]:
+    """Detect GPU information using nvidia-smi."""
+    try:
+        result = subprocess.run(
+            ['nvidia-smi', '--query-gpu=name,memory.total,driver_version', '--format=csv,noheader,nounits'],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode == 0:
+            parts = result.stdout.strip().split(', ')
+            return {
+                'name': parts[0] if len(parts) > 0 else 'Unknown',
+                'memory_mb': int(parts[1]) if len(parts) > 1 else 0,
+                'driver': parts[2] if len(parts) > 2 else 'Unknown',
+                'detected': True
+            }
+    except Exception:
+        pass
+    return {'name': 'Unknown', 'memory_mb': 0, 'driver': 'Unknown', 'detected': False}
+
+
+# ============================================================================
+# WARMUP
+# ============================================================================
+
+def run_warmup(api_url: str, model_id: str, timeout: int = 60) -> bool:
+    """Run warmup requests to compile CUDA graphs and warm caches."""
+    print(f"  {C.CYAN}Running warmup...{C.RESET}", end=" ", flush=True)
+    try:
+        # Simple warmup request
+        response = requests.post(
+            f"{api_url}/chat/completions",
+            json={
+                'model': model_id,
+                'messages': [{'role': 'user', 'content': 'Say hello.'}],
+                'max_tokens': 32,
+                'temperature': 0.0,
+            },
+            timeout=timeout
+        )
+        if response.status_code == 200:
+            print(f"{C.PASS}OK{C.RESET}")
+            return True
+        else:
+            print(f"{C.FAIL}Failed (HTTP {response.status_code}){C.RESET}")
+            return False
+    except Exception as e:
+        print(f"{C.FAIL}Failed ({e}){C.RESET}")
+        return False
+
+
+# ============================================================================
+# PARALLEL BENCHMARK (Async)
+# ============================================================================
+
+@dataclass
+class ParallelResult:
+    concurrency: int
+    total_requests: int
+    successful: int
+    failed: int
+    total_tokens: int
+    total_time: float
+    aggregate_throughput: float
+    per_request_throughput: float
+    avg_latency: float
+    p50_latency: float
+    p95_latency: float
+
+
+async def call_model_async(
+    session: 'aiohttp.ClientSession',
+    api_url: str,
+    model_id: str,
+    prompt: str,
+    max_tokens: int,
+    timeout: int = 300
+) -> Tuple[bool, int, float, Optional[str]]:
+    """Make async API call. Returns (success, tokens, latency, error)."""
+    start_time = time.time()
+    try:
+        async with session.post(
+            f"{api_url}/chat/completions",
+            json={
+                'model': model_id,
+                'messages': [{'role': 'user', 'content': prompt}],
+                'max_tokens': max_tokens,
+                'temperature': 0.0,
+            },
+            timeout=aiohttp.ClientTimeout(total=timeout)
+        ) as response:
+            data = await response.json()
+            if response.status != 200:
+                error = data.get('error', {}).get('message', f'HTTP {response.status}')
+                return False, 0, time.time() - start_time, error
+            tokens = data.get('usage', {}).get('total_tokens', 0)
+            return True, tokens, time.time() - start_time, None
+    except asyncio.TimeoutError:
+        return False, 0, time.time() - start_time, "Timeout"
+    except Exception as e:
+        return False, 0, time.time() - start_time, str(e)
+
+
+async def run_parallel_requests(
+    api_url: str,
+    model_id: str,
+    prompts: List[Dict],
+    concurrency: int,
+    max_tokens: int = 512,
+    timeout: int = 300
+) -> ParallelResult:
+    """Run multiple requests concurrently."""
+    # Build request list - cycle through prompts to reach concurrency
+    requests_list = []
+    for i in range(concurrency):
+        p = prompts[i % len(prompts)]
+        requests_list.append({'prompt': p['prompt'], 'max_tokens': max_tokens})
+
+    connector = aiohttp.TCPConnector(limit=concurrency + 10)
+    async with aiohttp.ClientSession(connector=connector) as session:
+        start_time = time.time()
+        tasks = [
+            call_model_async(session, api_url, model_id, r['prompt'], r['max_tokens'], timeout)
+            for r in requests_list
+        ]
+        results = await asyncio.gather(*tasks)
+        total_time = time.time() - start_time
+
+    # Analyze results
+    successful = [(tokens, latency) for success, tokens, latency, _ in results if success]
+    failed = [(err,) for success, _, _, err in results if not success]
+
+    total_tokens = sum(t for t, _ in successful)
+    latencies = [l for _, l in successful] if successful else [0]
+
+    aggregate_tps = total_tokens / total_time if total_time > 0 else 0
+
+    return ParallelResult(
+        concurrency=concurrency,
+        total_requests=len(results),
+        successful=len(successful),
+        failed=len(failed),
+        total_tokens=total_tokens,
+        total_time=total_time,
+        aggregate_throughput=aggregate_tps,
+        per_request_throughput=aggregate_tps / concurrency if concurrency > 0 else 0,
+        avg_latency=statistics.mean(latencies) if latencies else 0,
+        p50_latency=statistics.median(latencies) if latencies else 0,
+        p95_latency=sorted(latencies)[int(len(latencies) * 0.95)] if len(latencies) > 1 else latencies[0] if latencies else 0,
+    )
+
+
+def run_parallel_benchmark(
+    api_url: str,
+    model_id: str,
+    tests_to_run: List[str],
+    max_concurrent: int = 32,
+    max_tokens: int = 512,
+    timeout: int = 300
+) -> Dict[str, Any]:
+    """Run the parallel benchmark leg using real practical test prompts."""
+
+    if not ASYNC_AVAILABLE:
+        print(f"{C.FAIL}aiohttp not installed. Run: pip install aiohttp{C.RESET}")
+        return {}
+
+    # Build prompts from real practical tests
+    prompts = []
+    for test_key in tests_to_run:
+        if test_key in PRACTICAL_TESTS:
+            prompts.append({
+                'name': PRACTICAL_TESTS[test_key]['name'],
+                'prompt': PRACTICAL_TESTS[test_key]['prompt'],
+            })
+
+    if not prompts:
+        print(f"{C.FAIL}No valid prompts for parallel test{C.RESET}")
+        return {}
+
+    print(f"\n{C.CYAN}Auto-detecting optimal concurrency...{C.RESET}")
+
+    # Test increasing concurrency levels
+    test_levels = [1, 2, 4, 8, 16, 32, 64]
+    test_levels = [c for c in test_levels if c <= max_concurrent]
+
+    detection_results = []
+    optimal_conc = 1
+    peak_throughput = 0
+
+    for conc in test_levels:
+        print(f"  Testing concurrency={conc}...", end=" ", flush=True)
+        result = asyncio.run(run_parallel_requests(
+            api_url, model_id, prompts, conc, max_tokens=256, timeout=120
+        ))
+        detection_results.append(result)
+        print(f"{result.aggregate_throughput:.1f} tok/s")
+
+        if result.aggregate_throughput > peak_throughput:
+            peak_throughput = result.aggregate_throughput
+            optimal_conc = conc
+
+        # Stop if throughput declining significantly or too many failures
+        if len(detection_results) > 2:
+            if result.aggregate_throughput < detection_results[-2].aggregate_throughput * 0.85:
+                break
+        if result.failed > result.successful:
+            print(f"  {C.YELLOW}Too many failures, stopping detection{C.RESET}")
+            break
+
+    print(f"\n{C.PASS}Optimal concurrency: {optimal_conc} ({peak_throughput:.1f} tok/s){C.RESET}")
+
+    # Now run full benchmark at selected concurrency levels
+    concurrency_levels = [1, 2, 4, 8, 16, 32]
+    concurrency_levels = [c for c in concurrency_levels if c <= max_concurrent]
+    if optimal_conc not in concurrency_levels:
+        concurrency_levels.append(optimal_conc)
+        concurrency_levels.sort()
+
+    print(f"\n{C.CYAN}Running full parallel benchmark...{C.RESET}")
+    print(f"  Concurrency levels: {concurrency_levels}")
+    print(f"  Prompts: {len(prompts)} practical tests")
+
+    parallel_results = []
+    for conc in concurrency_levels:
+        print(f"  Concurrency {conc}...", end=" ", flush=True)
+        result = asyncio.run(run_parallel_requests(
+            api_url, model_id, prompts, conc, max_tokens=max_tokens, timeout=timeout
+        ))
+        parallel_results.append(result)
+
+        status = C.PASS if result.failed == 0 else C.YELLOW
+        marker = " <- peak" if conc == optimal_conc else ""
+        print(f"{status}{result.aggregate_throughput:.1f} tok/s "
+              f"({result.successful}/{result.total_requests} ok){C.RESET}{marker}")
+
+    # Find peak from full benchmark
+    peak_result = max(parallel_results, key=lambda r: r.aggregate_throughput)
+
+    return {
+        'optimal_concurrency': optimal_conc,
+        'peak_throughput': peak_result.aggregate_throughput,
+        'results': [
+            {
+                'concurrency': r.concurrency,
+                'throughput': r.aggregate_throughput,
+                'per_request': r.per_request_throughput,
+                'avg_latency': r.avg_latency,
+                'p50_latency': r.p50_latency,
+                'p95_latency': r.p95_latency,
+                'successful': r.successful,
+                'failed': r.failed,
+            }
+            for r in parallel_results
+        ]
+    }
+
+
+def call_model(api_url: str, model_id: str, prompt: str,
                max_tokens: int = 8192, temperature: float = 0.0,
-               timeout: int = 600) -> tuple:
+               timeout: int = 600, debug: bool = False) -> tuple:
     """Call model API and return (response, tokens_used, time_seconds)."""
     start_time = time.time()
-    
+
     try:
+        if debug:
+            print(f"  [DEBUG] Calling {api_url}/chat/completions...")
         response = requests.post(
             f"{api_url}/chat/completions",
             json={
@@ -861,16 +1134,22 @@ def call_model(api_url: str, model_id: str, prompt: str,
             },
             timeout=timeout
         )
-        
+
+        if debug:
+            print(f"  [DEBUG] Status: {response.status_code}")
         data = response.json()
         content = data['choices'][0]['message']['content']
         tokens = data.get('usage', {}).get('total_tokens', 0)
         elapsed = time.time() - start_time
-        
+
+        if debug:
+            print(f"  [DEBUG] Got {tokens} tokens in {elapsed:.1f}s")
         return strip_thinking_tags(content), tokens, elapsed
-        
+
     except Exception as e:
         elapsed = time.time() - start_time
+        if debug:
+            print(f"  [DEBUG] ERROR: {type(e).__name__}: {e}")
         return f"ERROR: {e}", 0, elapsed
 
 
@@ -919,7 +1198,8 @@ def run_practical_tests(api_url: str, model_id: str,
             api_url, model_id, test["prompt"],
             max_tokens=settings.get('max_tokens', 8192),
             temperature=settings.get('temperature', 0.0),
-            timeout=settings.get('timeout', 600)
+            timeout=settings.get('timeout', 600),
+            debug=True
         )
         
         score, max_score, details = evaluate_practical_test(test_key, response)
@@ -1063,11 +1343,69 @@ def print_comparison_report(results: List[ModelResults]):
             throughput_row += f"{'N/A':>15}"
     print(throughput_row)
     
+    # Parallel results (if available)
+    has_parallel = any(m.parallel_results for m in results)
+    if has_parallel:
+        print(f"\n{C.CYAN}PARALLEL BENCHMARK{C.RESET}")
+        print("-" * 72)
+        print(f"{'Concurrency':<15}", end="")
+        for model in results:
+            print(f"{model.name[:15]:>15}", end="")
+        print()
+        print("-" * 72)
+
+        # Find all concurrency levels tested
+        all_conc = set()
+        for model in results:
+            if model.parallel_results and 'results' in model.parallel_results:
+                for r in model.parallel_results['results']:
+                    all_conc.add(r['concurrency'])
+
+        for conc in sorted(all_conc):
+            row = f"{conc:<15}"
+            for model in results:
+                if model.parallel_results and 'results' in model.parallel_results:
+                    r = next((x for x in model.parallel_results['results'] if x['concurrency'] == conc), None)
+                    if r:
+                        row += f"{r['throughput']:>12.1f} t/s"
+                    else:
+                        row += f"{'N/A':>15}"
+                else:
+                    row += f"{'N/A':>15}"
+            print(row)
+
+        # Peak throughput
+        peak_row = f"{'Peak'::<15}"
+        for model in results:
+            if model.parallel_results and 'peak_throughput' in model.parallel_results:
+                peak_row += f"{C.PASS}{model.parallel_results['peak_throughput']:>12.1f} t/s{C.RESET}"
+            else:
+                peak_row += f"{'N/A':>15}"
+        print(peak_row)
+
+        # Optimal concurrency
+        opt_row = f"{'Optimal Conc.':<15}"
+        for model in results:
+            if model.parallel_results and 'optimal_concurrency' in model.parallel_results:
+                opt_row += f"{model.parallel_results['optimal_concurrency']:>15}"
+            else:
+                opt_row += f"{'N/A':>15}"
+        print(opt_row)
+
+    # GPU info (if available)
+    has_gpu = any(m.gpu_info.get('detected') for m in results)
+    if has_gpu:
+        print(f"\n{C.CYAN}HARDWARE{C.RESET}")
+        print("-" * 72)
+        for model in results:
+            if model.gpu_info.get('detected'):
+                print(f"  {model.name}: {model.gpu_info['name']} ({model.gpu_info['memory_mb']}MB)")
+
     # Winner
     if len(results) > 1:
         best = max(results, key=lambda m: sum(t.score for t in m.tests))
         print(f"\n{C.PASS}Winner: {best.name}{C.RESET}")
-    
+
     print("=" * 72)
 
 
@@ -1084,21 +1422,26 @@ def save_results(results: List[ModelResults], output_dir: str):
             "name": model.name,
             "api_url": model.api_url,
             "timestamp": model.timestamp,
-            "tests": [
-                {
-                    "name": t.name,
-                    "passed": t.passed,
-                    "score": t.score,
-                    "max_score": t.max_score,
-                    "details": t.details,
-                    "tokens_used": t.tokens_used,
-                    "time_seconds": t.time_seconds,
-                }
-                for t in model.tests
-            ]
+            "gpu_info": model.gpu_info,
+            "sequential": {
+                "tests": [
+                    {
+                        "name": t.name,
+                        "passed": t.passed,
+                        "score": t.score,
+                        "max_score": t.max_score,
+                        "details": t.details,
+                        "tokens_used": t.tokens_used,
+                        "time_seconds": t.time_seconds,
+                    }
+                    for t in model.tests
+                ],
+                "throughput": model.throughput,
+            },
+            "parallel": model.parallel_results if model.parallel_results else None,
         }
         data.append(model_data)
-    
+
     with open(json_path, 'w') as f:
         json.dump(data, f, indent=2)
     print(f"\nResults saved to: {json_path}")
@@ -1148,6 +1491,12 @@ Examples:
                        help='Include long context tests')
     parser.add_argument('--list-tests', action='store_true',
                        help='List available tests and exit')
+    parser.add_argument('--parallel', action='store_true',
+                       help='Include parallel benchmark (tests concurrent request throughput)')
+    parser.add_argument('--parallel-only', action='store_true',
+                       help='Run only the parallel benchmark, skip sequential tests')
+    parser.add_argument('--max-concurrent', type=int, default=32,
+                       help='Maximum concurrency for parallel tests (default: 32)')
     parser.add_argument('--version', action='version', version=f'%(prog)s {VERSION}')
     
     args = parser.parse_args()
@@ -1180,9 +1529,17 @@ Examples:
         else:
             tests_to_run = list(PRACTICAL_TESTS.keys())
     
+    # Detect GPU
+    gpu_info = detect_gpu()
+
     print(f"\n{C.BOLD}{C.HEADER}Model Comparison Test Harness v{VERSION}{C.RESET}")
+    if gpu_info['detected']:
+        print(f"GPU: {gpu_info['name']} ({gpu_info['memory_mb']}MB)")
     print(f"Tests: {', '.join(tests_to_run)}")
     print(f"Models: {len(config['models'])}")
+    if args.parallel or args.parallel_only:
+        print(f"Mode: {'Parallel only' if args.parallel_only else 'Sequential + Parallel'}")
+        print(f"Max concurrent: {args.max_concurrent}")
     
     # Run tests for each model
     all_results = []
@@ -1198,25 +1555,61 @@ Examples:
             api_url=model_config['api_url'],
             timestamp=datetime.now().isoformat(),
         )
-        
-        # Run practical tests
-        practical_results = run_practical_tests(
-            model_config['api_url'],
-            model_config.get('model_id', model_config['name']),
-            tests=tests_to_run,
-            settings=config.get('settings', {})
-        )
-        model_results.tests.extend(practical_results)
-        
+
+        model_id = model_config.get('model_id', model_config['name'])
+
+        # Warmup
+        run_warmup(model_config['api_url'], model_id)
+
+        # Run sequential practical tests (unless --parallel-only)
+        if not args.parallel_only:
+            print(f"\n{C.BOLD}LEG 1: SEQUENTIAL (Latency Mode){C.RESET}")
+            print("-" * 40)
+
+            practical_results = run_practical_tests(
+                model_config['api_url'],
+                model_id,
+                tests=tests_to_run,
+                settings=config.get('settings', {})
+            )
+            model_results.tests.extend(practical_results)
+
+            # Calculate sequential throughput
+            total_tokens = sum(t.tokens_used for t in practical_results)
+            total_time = sum(t.time_seconds for t in practical_results)
+            seq_throughput = total_tokens / total_time if total_time > 0 else 0
+            model_results.throughput = seq_throughput
+
+        # Run parallel benchmark if requested
+        parallel_data = None
+        if args.parallel or args.parallel_only:
+            print(f"\n{C.BOLD}LEG 2: PARALLEL (Throughput Mode){C.RESET}")
+            print("-" * 40)
+
+            parallel_data = run_parallel_benchmark(
+                model_config['api_url'],
+                model_id,
+                tests_to_run,
+                max_concurrent=args.max_concurrent,
+                max_tokens=config.get('settings', {}).get('max_tokens', 512),
+                timeout=config.get('settings', {}).get('timeout', 300)
+            )
+
+            if parallel_data:
+                model_results.parallel_results = parallel_data
+
         # Run long context tests if requested
-        if args.long_context:
+        if args.long_context and not args.parallel_only:
             lc_results = run_long_context_test(
                 model_config['api_url'],
-                model_config.get('model_id', model_config['name']),
+                model_id,
                 settings=config.get('settings', {})
             )
             model_results.tests.extend(lc_results)
-        
+
+        # Store GPU info
+        model_results.gpu_info = gpu_info
+
         all_results.append(model_results)
     
     # Print comparison report
