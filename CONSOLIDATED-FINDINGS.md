@@ -14,6 +14,7 @@
 | **Nemotron-3-Nano-30B** | BF16 | 8 | No | **100%** (22/22) | **205** | 1628 @ C=32 | 16K |
 | **Qwen3-Coder-30B-A3B** | AWQ | 4 | No | **100%** (22/22) | 184 | 1025 @ C=32 | 32K |
 | **GLM-4.7-Flash** | AWQ | 4 | No | **100%** (22/22) | 101 | 566 @ C=8 | 65K |
+| **Magistral-Small-2509** | BF16 | 8 | Yes§ | **95.5%** (21/22) | 88 | 1071 @ C=32 | 131K |
 | **Magistral-Small-2506** | AWQ | 8 | No* | **95.5%** (21/22) | 156 | **1831** @ C=32 | 32K |
 | **Qwen3-32B** | AWQ | 8 | Yes | 95.5% (21/22) | 78 | 1013 @ C=32 | 32K |
 | **EXAONE-4.0-32B** | AWQ | 2 | No‡ | 95.5% (21/22) | 66 | 748 @ C=32 | 32K |
@@ -25,7 +26,8 @@
 | DS-R1-Distill-Llama-70B | AWQ | 8 | Yes | 45.5% (10/22) | 57 | 540 @ C=32 | 16K |
 | GPT-OSS-20B | MXFP4 | 8 | No | 40.9%** | 52 | 933 @ C=16 | 8K |
 
-\* Magistral has reasoning capability but community AWQ quant dropped `begin_think` control tokens
+§ Magistral-Small-2509 has proper [THINK]/[/THINK] special tokens, requires --tokenizer-mode mistral --config-format mistral --load-format mistral --reasoning-parser mistral
+\* Magistral-2506 has reasoning capability but community AWQ quant dropped `begin_think` control tokens
 \** Quality unreliable - reasoning parser strips content to None on most tests
 † Devstral-2-123B: 32K context / 32 max-seqs with fp8 KV cache (was 16K/16 without). Requires compressed-tensors patch.
 ‡ EXAONE has `<think>` tokens but not in chat template; limited to TP=2 (AWQ intermediate_size alignment)
@@ -283,6 +285,7 @@ All raw benchmark JSON files are in `/home/llm/llm-bench/results-8xA4000/`:
 ### Round 5 (Feb 15) - PP tests + fp8 KV compressed-tensors patch
 - `comparison_20260214_222425.json` - EXAONE-4.0-32B AWQ (TP=2 PP=4, all 8 GPUs)
 - `comparison_20260215_004318.json` - Devstral-2-123B AWQ (fp8 KV cache, 32K context)
+- `comparison_20260215_015429.json` - Magistral-Small-2509 BF16 (mistral format, 131K context)
 
 ---
 
