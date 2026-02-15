@@ -10,7 +10,7 @@
 
 | Model | Quant | TP | Reasoning | Quality | Single t/s | Peak t/s | Context |
 |-------|-------|-----|-----------|---------|-----------|----------|---------|
-| **Devstral-2-123B** | AWQ | 8 | No | **100%** (22/22) | 46 | 282 @ C=16 | 16K† |
+| **Devstral-2-123B** | AWQ | 8 | No | **100%** (22/22) | 41 | 300 @ C=32 | 32K† |
 | **Nemotron-3-Nano-30B** | BF16 | 8 | No | **100%** (22/22) | **205** | 1628 @ C=32 | 16K |
 | **Qwen3-Coder-30B-A3B** | AWQ | 4 | No | **100%** (22/22) | 184 | 1025 @ C=32 | 32K |
 | **GLM-4.7-Flash** | AWQ | 4 | No | **100%** (22/22) | 101 | 566 @ C=8 | 65K |
@@ -27,7 +27,7 @@
 
 \* Magistral has reasoning capability but community AWQ quant dropped `begin_think` control tokens
 \** Quality unreliable - reasoning parser strips content to None on most tests
-† Devstral-2-123B limited to 16K context / 16 max-num-seqs due to tight VRAM (78GB model / 128GB total)
+† Devstral-2-123B: 32K context / 32 max-seqs with fp8 KV cache (was 16K/16 without). Requires compressed-tensors patch.
 ‡ EXAONE has `<think>` tokens but not in chat template; limited to TP=2 (AWQ intermediate_size alignment)
 
 ### Category Winners
@@ -88,26 +88,32 @@
 - Reasoning mode introduces parsing overhead that can hurt structured test scores
 - For coding tasks, a fast non-reasoning model + human reasoning may outperform model reasoning
 
-### 6. Devstral-2-123B: Quality King, Speed Trade-off
+### 6. Devstral-2-123B: Quality King, Now with fp8 KV Cache
 - Only model to score **5/5 on Stratum Protocol** (byte order/endianness test)
 - At 123B dense parameters (78GB AWQ), it's the largest model that fits on 8x A4000
-- ~9.75GB/GPU for weights leaves only ~6.25GB for KV cache → limited to 16K context, 16 max-num-seqs
-- Single-request speed: 46 t/s (usable for C=1 workflow), peak: 282 t/s @ C=16
+- **With fp8 KV cache** (after compressed-tensors patch): 32K context, 32 max-seqs, 300 t/s peak
+- **Without fp8 KV**: 16K context, 16 max-seqs, 282 t/s peak
+- Quality preserved at 100% (22/22) with fp8 KV - no accuracy loss
 - Demonstrates that bigger models DO score better on the hardest tests
 
-### 7. EXAONE-4.0-32B: AWQ Alignment Limits TP
+### 7. EXAONE-4.0-32B: AWQ Alignment Limits TP, PP Doesn't Help
 - 95.5% quality at 32B dense, has `<think>` tokens but not in default chat template
 - AWQ quantized with intermediate_size=27392, which doesn't divide evenly at TP>2
 - Stuck at TP=2 → only uses 2 of 8 GPUs → 66 t/s single, 748 t/s peak
-- A properly aligned quant (GPTQ, or different group_size) could potentially fix this
+- **PP=4 tested (TP=2 PP=4 = 8 GPUs)**: quality dropped to 77.3%, peak dropped to 556 t/s (-26%), only benefit was 131K context (vs 32K). Pipeline latency overhead hurts both speed and quality. Not recommended.
+- **Official GPTQ also fails at TP=8**: Same alignment issue (Marlin: 3424%128≠0, Exllama: blocked by desc_act+TP, basic GPTQ: also alignment constrained). Fix requires custom GPTQ with `group_size=32, desc_act=False`
 
-### 9. fp8 KV Cache Now Works on vLLM (After Patch)
-- Fixed the flashinfer `non_blocking=None` bug (positional arg mismatch with o_data_type)
+### 9. fp8 KV Cache Now Works on vLLM (After Two Patches)
+- **Patch 1**: Fixed flashinfer `non_blocking=None` bug (positional arg mismatch with o_data_type)
+  - File: `vllm/v1/attention/backends/flashinfer.py` line 1590 - changed positional to keyword args
+- **Patch 2**: Fixed compressed-tensors false rejection of fp8 KV cache
+  - File: `vllm/model_executor/layers/quantization/compressed_tensors/compressed_tensors.py` line 179
+  - Bug: `get_quant_method()` unconditionally returned `CompressedTensorsKVCacheMethod` for all Attention layers, even when `kv_cache_scheme` is null
+  - Fix: Check `if self.kv_cache_scheme is not None` before returning KV cache quant method
 - Magistral at TP=8: 11.97 GiB KV per GPU, 1.25M tokens, 38x concurrency at 32K
 - Seed-OSS-36B: unlocked **64K context** (up from 32K) with fp8 KV, 730K tokens, 11x @ 64K
-- **Compressed-tensors quants** (cyankiwi/Devstral-2-123B) reject fp8 KV: "not supported with fp8 checkpoints"
-- Standard AWQ quants (QuantTrio, abhishekchohan) work fine with fp8 KV
-- **Key file patched**: `/home/llm/hf-env/lib/python3.12/site-packages/vllm/v1/attention/backends/flashinfer.py` line 1590
+- **Devstral-2-123B**: unlocked **32K context** (up from 16K) with fp8 KV, 227K tokens, quality preserved at 100%
+- All AWQ/GPTQ/compressed-tensors quants now work with fp8 KV cache
 
 ### 10. SGLang vs vLLM: vLLM Wins for Most Models
 - Tested 3 models on SGLang (Devstral-2-123B, Nemotron-3-Nano-30B, Qwen3-Coder-30B-A3B)
@@ -273,6 +279,10 @@ All raw benchmark JSON files are in `/home/llm/llm-bench/results-8xA4000/`:
 ### Round 4 (Feb 14) - SGLang cross-framework comparison
 - `comparison_20260214_202736.json` - Nemotron-3-Nano-30B BF16 (SGLang TP=8)
 - `comparison_20260214_220116.json` - Qwen3-Coder-30B-A3B AWQ (SGLang TP=4, fp8 KV)
+
+### Round 5 (Feb 15) - PP tests + fp8 KV compressed-tensors patch
+- `comparison_20260214_222425.json` - EXAONE-4.0-32B AWQ (TP=2 PP=4, all 8 GPUs)
+- `comparison_20260215_004318.json` - Devstral-2-123B AWQ (fp8 KV cache, 32K context)
 
 ---
 
