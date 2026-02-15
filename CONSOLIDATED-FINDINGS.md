@@ -1,5 +1,5 @@
 # Consolidated LLM Benchmark Findings
-**Updated: February 14, 2026**
+**Updated: February 15, 2026**
 **Platform: 8x RTX A4000 (16GB each, 128GB total), EPYC 7532 (Rome), PCIe Gen4**
 
 ---
@@ -18,6 +18,7 @@
 | **Magistral-Small-2506** | AWQ | 8 | No* | **95.5%** (21/22) | 156 | **1831** @ C=32 | 32K |
 | **Qwen3-32B** | AWQ | 8 | Yes | 95.5% (21/22) | 78 | 1013 @ C=32 | 32K |
 | **EXAONE-4.0-32B** | AWQ | 2 | No‡ | 95.5% (21/22) | 66 | 748 @ C=32 | 32K |
+| **Nanbeige4.1-3B** | BF16 | 4 | Yes¶ | 77.3% (17/22) | 187 | 1239 @ C=64 | 131K |
 | Qwen3-30B-A3B | AWQ | 4 | No | 95.5% (21/22) | 178 | 1575 @ C=32 | 32K |
 | Devstral-Small-2-24B | AWQ | 8 | No | 95.5% (21/22) | 148 | 1452 @ C=32 | 32K |
 | **Seed-OSS-36B** | AWQ | 8 | Yes | 90.9% (20/22) | 88 | 1163 @ C=32 | 32K |
@@ -31,6 +32,7 @@
 \** Quality unreliable - reasoning parser strips content to None on most tests
 † Devstral-2-123B: 32K context / 32 max-seqs with fp8 KV cache (was 16K/16 without). Requires compressed-tensors patch.
 ‡ EXAONE has `<think>` tokens but not in chat template; limited to TP=2 (AWQ intermediate_size alignment)
+¶ Nanbeige4.1-3B uses `<think>` tags (Qwen3-style reasoning), only 3B params, LlamaForCausalLM architecture
 
 ### Category Winners
 
@@ -125,7 +127,16 @@
 - **Exception**: GLM-4.7-Flash works ONLY on SGLang (GLMForCausalLM architecture) - 100% quality, 101 t/s
 - **Conclusion**: Use vLLM for all models except GLM family. SGLang offers no speed or quality advantage on this hardware
 
-### 11. The "2 KV Head Problem" Blocks Many New Models
+### 11. Nanbeige4.1-3B: Best Quality-per-Parameter Ratio
+- **77.3% quality at only 3B parameters** - matches EXAONE-4.0-32B (10x larger)
+- Uses `<think>` reasoning (like Qwen3), 131K context, LlamaForCausalLM architecture
+- 187 t/s single-request, 1239 t/s peak @ C=64 (on TP=4, only 4 GPUs)
+- At ~6GB BF16, fits on a **single 16GB GPU** - no multi-GPU needed
+- 20 attention heads limits TP to 4 max (same as GLM-4.7-Flash)
+- Failed: atomicity bug (Payment), memory leak pruning (Stratum), some HiveOS wrapper checks
+- **Best use case**: Edge deployment, resource-constrained environments, or high-throughput reasoning at minimal cost
+
+### 12. The "2 KV Head Problem" Blocks Many New Models
 - Qwen3-Next-80B, Qwen3-Coder-Next, MiniCPM-SALA all have only 2 KV heads
 - Max TP=2, making them impractical on multi-GPU setups with 16GB/card
 - This is a growing trend in newer architectures (linear attention, DeltaNet hybrids)
@@ -198,6 +209,7 @@ vllm serve abhishekchohan/Magistral-Small-2506-AWQ \
 | Qwen3-Coder-30B-A3B | 32 | 4 | 4 | 4 | MoE | 128E/8A |
 | Qwen3-30B-A3B-Thinking | 32 | 4 | 4 | 4 | MoE | Thinking variant |
 | GLM-4.7-Flash | 20 | 20 | 4 | 4 | MoE | SGLang only |
+| Nanbeige4.1-3B | 20 | 4 | 4 | 4 | Dense | 3B reasoning model, LlamaForCausalLM |
 | EXAONE-4.0-32B | 40 | 8 | 2* | 2 | Dense | AWQ intermediate_size not aligned at TP>2 |
 
 ---
@@ -205,14 +217,15 @@ vllm serve abhishekchohan/Magistral-Small-2506-AWQ \
 ## Parallel Throughput Scaling (All Models)
 
 ### Non-Reasoning Models
-| C | Seed-OSS | Qwen3-Coder | Qwen3-30B | Devstral-S | Nemotron | GLM-4.7 | Magistral | Devstral-2 | EXAONE |
-|:-:|:--------:|:-----------:|:---------:|:----------:|:--------:|:-------:|:---------:|:----------:|:------:|
-| 1 | 78 | 184 | 178 | 180 | 205 | 101 | 156 | 46 | 66 |
-| 2 | 168 | 333 | 347 | 186 | 327 | 188 | 275 | 76 | 147 |
-| 4 | 373 | 462 | 621 | 425 | 571 | 356 | 524 | 126 | 255 |
-| 8 | 616 | 589 | 869 | 691 | 765 | **566** | 839 | 188 | 385 |
-| 16 | 923 | 840 | 1208 | 1051 | 1158 | 255* | 1266 | **282** | 575 |
-| 32 | **1163** | **1025** | **1575** | **1452** | **1628** | 511 | **1831** | - | **748** |
+| C | Seed-OSS | Qwen3-Coder | Qwen3-30B | Devstral-S | Nemotron | GLM-4.7 | Magistral | Devstral-2 | EXAONE | Nanbeige-3B |
+|:-:|:--------:|:-----------:|:---------:|:----------:|:--------:|:-------:|:---------:|:----------:|:------:|:-----------:|
+| 1 | 78 | 184 | 178 | 180 | 205 | 101 | 156 | 46 | 66 | 249 |
+| 2 | 168 | 333 | 347 | 186 | 327 | 188 | 275 | 76 | 147 | 251 |
+| 4 | 373 | 462 | 621 | 425 | 571 | 356 | 524 | 126 | 255 | 279 |
+| 8 | 616 | 589 | 869 | 691 | 765 | **566** | 839 | 188 | 385 | 453 |
+| 16 | 923 | 840 | 1208 | 1051 | 1158 | 255* | 1266 | **282** | 575 | 737 |
+| 32 | **1163** | **1025** | **1575** | **1452** | **1628** | 511 | **1831** | - | **748** | 1044 |
+| 64 | - | - | - | - | - | - | - | - | - | **1239** |
 
 ### Reasoning Models
 | C | Qwen3-32B | Qwen3-30B-Think | DS-R1-32B | DS-R1-70B |
@@ -236,6 +249,7 @@ vllm serve abhishekchohan/Magistral-Small-2506-AWQ \
 | **Qwen3-32B** | 95.5% | `<think>` tags | ~78 t/s total | Good | Good |
 | Qwen3-30B-A3B-Think | 81.8% | `<think>` tags | ~160 t/s total | Decent | Weak on some |
 | DS-R1-Distill-Qwen-32B | 54.5% | `<think>` tags | ~78 t/s total | Verbose | Poor |
+| **Nanbeige4.1-3B** | 77.3% | `<think>` tags | ~187 t/s total | Decent - concise | Decent |
 | DS-R1-Distill-Llama-70B | 45.5% | `<think>` tags | ~57 t/s total | Verbose | Very poor |
 
 **Recommendation**: For reasoning/discussion, use Seed-OSS-36B (best think quality at practical speed) or Qwen3-32B (higher structured quality but slower).
@@ -286,6 +300,9 @@ All raw benchmark JSON files are in `/home/llm/llm-bench/results-8xA4000/`:
 - `comparison_20260214_222425.json` - EXAONE-4.0-32B AWQ (TP=2 PP=4, all 8 GPUs)
 - `comparison_20260215_004318.json` - Devstral-2-123B AWQ (fp8 KV cache, 32K context)
 - `comparison_20260215_015429.json` - Magistral-Small-2509 BF16 (mistral format, 131K context)
+
+### Round 6 (Feb 15) - Small reasoning model
+- `comparison_20260215_034513.json` - Nanbeige4.1-3B BF16 (TP=4, 131K ctx, reasoning)
 
 ---
 

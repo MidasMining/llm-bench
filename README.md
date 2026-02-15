@@ -38,9 +38,10 @@ Comprehensive benchmarking suite for evaluating local LLM models on real-world c
 | 10 | Devstral-Small-2-24B | AWQ | 8 | 95.5% (21/22) | 148 | 1452 @ C=32 | 32K | vLLM |
 | 11 | Seed-OSS-36B | AWQ | 8 | 90.9% (20/22) | 88 | 1163 @ C=32 | 32K | vLLM |
 | 12 | Qwen3-30B-A3B-Thinking | AWQ | 4 | 81.8% (18/22) | 160 | 1031 @ C=32 | 32K | vLLM |
-| 13 | DS-R1-Distill-Qwen-32B | AWQ | 8 | 54.5% (12/22) | 78 | 992 @ C=32 | 32K | vLLM |
-| 14 | DS-R1-Distill-Llama-70B | AWQ | 8 | 45.5% (10/22) | 57 | 540 @ C=32 | 16K | vLLM |
-| 15 | GPT-OSS-20B | MXFP4 | 8 | 40.9% (9/22) | 52 | 933 @ C=16 | 8K | vLLM |
+| 13 | **Nanbeige4.1-3B** | BF16 | 4 | 77.3% (17/22) | 187 | 1239 @ C=64 | 131K | vLLM |
+| 14 | DS-R1-Distill-Qwen-32B | AWQ | 8 | 54.5% (12/22) | 78 | 992 @ C=32 | 32K | vLLM |
+| 15 | DS-R1-Distill-Llama-70B | AWQ | 8 | 45.5% (10/22) | 57 | 540 @ C=32 | 16K | vLLM |
+| 16 | GPT-OSS-20B | MXFP4 | 8 | 40.9% (9/22) | 52 | 933 @ C=16 | 8K | vLLM |
 
 ### Category Winners
 
@@ -69,20 +70,22 @@ Comprehensive benchmarking suite for evaluating local LLM models on real-world c
 | Devstral-Small-2-24B | 2/2 | 3/3 | 4/4 | 4/5 | 8/8 | 21/22 |
 | Seed-OSS-36B | 2/2 | 3/3 | 4/4 | 3/5 | 8/8 | 20/22 |
 | Qwen3-30B-A3B-Think | 2/2 | 2/3 | 4/4 | 4/5 | 6/8 | 18/22 |
+| **Nanbeige4.1-3B** | 2/2 | 3/3 | 3/4 | 4/5 | 5/8 | **17/22** |
 | DS-R1-Distill-Qwen-32B | 2/2 | 2/3 | 0/4 | 0/5 | 8/8 | 12/22 |
 | DS-R1-Distill-Llama-70B | 2/2 | 0/3 | 0/4 | 0/5 | 8/8 | 10/22 |
 | GPT-OSS-20B | 0/2 | 3/3 | 0/4 | 0/5 | 6/8 | 9/22 |
 
 ### Throughput Scaling (tokens/second)
 
-| Concurrency | Nemotron | Magistral-2506 | Qwen3-30B | Devstral-S | Seed-OSS | Qwen3-Coder | Magistral-2509 | Qwen3-32B | EXAONE | Devstral-2 |
-|:-----------:|:--------:|:--------------:|:---------:|:----------:|:--------:|:-----------:|:--------------:|:---------:|:------:|:----------:|
-| 1 | 205 | 156 | 178 | 180 | 78 | 184 | 88 | 78 | 66 | 41 |
-| 2 | 327 | 275 | 347 | 186 | 168 | 333 | 135 | 170 | 147 | 82 |
-| 4 | 571 | 524 | 621 | 425 | 373 | 462 | 229 | 331 | 255 | 124 |
-| 8 | 765 | 839 | 869 | 691 | 616 | 589 | 399 | 571 | 385 | 185 |
-| 16 | 1158 | 1266 | 1208 | 1051 | 923 | 840 | 649 | 825 | 575 | 271 |
-| **32** | **1628** | **1831** | **1575** | **1452** | **1163** | **1025** | **1071** | **1013** | **748** | **300** |
+| Concurrency | Nemotron | Magistral-2506 | Qwen3-30B | Devstral-S | Nanbeige-3B | Seed-OSS | Qwen3-Coder | Magistral-2509 | Qwen3-32B | EXAONE | Devstral-2 |
+|:-----------:|:--------:|:--------------:|:---------:|:----------:|:-----------:|:--------:|:-----------:|:--------------:|:---------:|:------:|:----------:|
+| 1 | 205 | 156 | 178 | 180 | 249 | 78 | 184 | 88 | 78 | 66 | 41 |
+| 2 | 327 | 275 | 347 | 186 | 251 | 168 | 333 | 135 | 170 | 147 | 82 |
+| 4 | 571 | 524 | 621 | 425 | 279 | 373 | 462 | 229 | 331 | 255 | 124 |
+| 8 | 765 | 839 | 869 | 691 | 453 | 616 | 589 | 399 | 571 | 385 | 185 |
+| 16 | 1158 | 1266 | 1208 | 1051 | 737 | 923 | 840 | 649 | 825 | 575 | 271 |
+| **32** | **1628** | **1831** | **1575** | **1452** | 1044 | **1163** | **1025** | **1071** | **1013** | **748** | **300** |
+| **64** | - | - | - | - | **1239** | - | - | - | - | - | - |
 
 ### Failed / Incompatible Models
 
@@ -122,7 +125,10 @@ Tested 3 models on SGLang - all performed worse than vLLM (Nemotron -47% peak, Q
 ### 7. Pipeline Parallelism Not Beneficial
 EXAONE TP=2+PP=4 (8 GPUs): quality dropped 18pp, throughput dropped 26%. Only gained context length. Pipeline latency overhead outweighs memory savings.
 
-### 8. AWQ/GPTQ Alignment Limits TP
+### 8. Nanbeige4.1-3B: 3B Reasoning Model Punches Above Its Weight
+At only 3B parameters (~6GB BF16), Nanbeige4.1-3B scores 77.3% - matching EXAONE-4.0-32B (10x larger). Uses `<think>` reasoning tags, 131K context, and achieves 187 t/s single-request. Fits on a single 16GB GPU. Best quality-per-parameter ratio in the benchmark.
+
+### 9. AWQ/GPTQ Alignment Limits TP
 Models with intermediate_size not divisible by `TP * group_size` (128) cannot use Marlin kernel at higher TP. Affects EXAONE (27392) and potentially others. Neither AWQ nor GPTQ format avoids this.
 
 ---
@@ -141,6 +147,7 @@ Models with intermediate_size not divisible by `TP * group_size` (128) cannot us
 | Qwen3-30B-A3B | 32 | 4 | 4 | MoE | 128 experts, 8 active |
 | Qwen3-Coder-30B-A3B | 32 | 4 | 4 | MoE | 128 experts, 8 active |
 | GLM-4.7-Flash | 20 | 20 | 4 | MoE | SGLang only |
+| Nanbeige4.1-3B | 20 | 4 | 4 | Dense | 3B reasoning, fits single GPU |
 | EXAONE-4.0-32B | 40 | 8 | 2 | Dense | AWQ alignment limit |
 
 ---
@@ -240,7 +247,7 @@ llm-bench/
 ├── parallel_benchmark.py          # Standalone throughput benchmark
 ├── models.yaml                    # Model configurations
 ├── CONSOLIDATED-FINDINGS.md       # Detailed analysis and findings
-├── results-8xA4000/               # 8x RTX A4000 benchmark results (19 JSON files)
+├── results-8xA4000/               # 8x RTX A4000 benchmark results (20 JSON files)
 ├── results-gen4/                   # PCIe Gen4 test results
 ├── results/                        # Legacy single-GPU results
 └── practical/                      # Individual test scripts
