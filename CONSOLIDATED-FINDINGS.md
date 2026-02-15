@@ -17,7 +17,7 @@
 | **Magistral-Small-2509** | BF16 | 8 | Yes§ | **95.5%** (21/22) | 88 | 1071 @ C=32 | 131K |
 | **Magistral-Small-2506** | AWQ | 8 | No* | **95.5%** (21/22) | 156 | **1831** @ C=32 | 32K |
 | **Qwen3-32B** | AWQ | 8 | Yes | 95.5% (21/22) | 78 | 1013 @ C=32 | 32K |
-| **EXAONE-4.0-32B** | AWQ | 2 | No‡ | 95.5% (21/22) | 66 | 748 @ C=32 | 32K |
+| **EXAONE-4.0-32B** | GPTQ g32 | 8 | No‡ | 95.5% (21/22) | 110 | 719 @ C=64 | 131K |
 | **Nanbeige4.1-3B** | BF16 | 4 | Yes¶ | 77.3% (17/22) | 187 | 1239 @ C=64 | 131K |
 | Qwen3-30B-A3B | AWQ | 4 | No | 95.5% (21/22) | 178 | 1575 @ C=32 | 32K |
 | Devstral-Small-2-24B | AWQ | 8 | No | 95.5% (21/22) | 148 | 1452 @ C=32 | 32K |
@@ -100,12 +100,17 @@
 - Quality preserved at 100% (22/22) with fp8 KV - no accuracy loss
 - Demonstrates that bigger models DO score better on the hardest tests
 
-### 7. EXAONE-4.0-32B: AWQ Alignment Limits TP, PP Doesn't Help
+### 7. EXAONE-4.0-32B: Custom GPTQ Unlocks TP=8
 - 95.5% quality at 32B dense, has `<think>` tokens but not in default chat template
 - AWQ quantized with intermediate_size=27392, which doesn't divide evenly at TP>2
-- Stuck at TP=2 → only uses 2 of 8 GPUs → 66 t/s single, 748 t/s peak
-- **PP=4 tested (TP=2 PP=4 = 8 GPUs)**: quality dropped to 77.3%, peak dropped to 556 t/s (-26%), only benefit was 131K context (vs 32K). Pipeline latency overhead hurts both speed and quality. Not recommended.
-- **Official GPTQ also fails at TP=8**: Same alignment issue (Marlin: 3424%128≠0, Exllama: blocked by desc_act+TP, basic GPTQ: also alignment constrained). Fix requires custom GPTQ with `group_size=32, desc_act=False`
+- **AWQ TP=2**: 66 t/s single, 748 t/s peak (only 2 of 8 GPUs)
+- **PP=4 tested (TP=2 PP=4)**: quality dropped to 77.3%, peak dropped to 556 t/s. Not recommended.
+- **Custom GPTQ g32 TP=8**: Quantized with GPTQModel (group_size=32, desc_act=False, sym=True)
+  - Marlin kernel handles most layers, Exllama fallback for misaligned `mlp.down_proj` (3424%128≠0)
+  - Requires `--dtype float16` for Exllama compatibility
+  - **110 t/s single (+67%), 719 t/s peak @ C=64** (peak ~same, single much faster)
+  - Quality preserved at 95.5% (21/22)
+  - GPTQModel quantization required CPU Hessian patch (27392×27392 matrix too large for 16GB GPU)
 
 ### 9. fp8 KV Cache Now Works on vLLM (After Two Patches)
 - **Patch 1**: Fixed flashinfer `non_blocking=None` bug (positional arg mismatch with o_data_type)
@@ -210,7 +215,7 @@ vllm serve abhishekchohan/Magistral-Small-2506-AWQ \
 | Qwen3-30B-A3B-Thinking | 32 | 4 | 4 | 4 | MoE | Thinking variant |
 | GLM-4.7-Flash | 20 | 20 | 4 | 4 | MoE | SGLang only |
 | Nanbeige4.1-3B | 20 | 4 | 4 | 4 | Dense | 3B reasoning model, LlamaForCausalLM |
-| EXAONE-4.0-32B | 40 | 8 | 2* | 2 | Dense | AWQ intermediate_size not aligned at TP>2 |
+| EXAONE-4.0-32B | 40 | 8 | 8* | 8 | Dense | Custom GPTQ g32 unlocks TP=8 (Marlin+Exllama hybrid) |
 
 ---
 
@@ -219,13 +224,13 @@ vllm serve abhishekchohan/Magistral-Small-2506-AWQ \
 ### Non-Reasoning Models
 | C | Seed-OSS | Qwen3-Coder | Qwen3-30B | Devstral-S | Nemotron | GLM-4.7 | Magistral | Devstral-2 | EXAONE | Nanbeige-3B |
 |:-:|:--------:|:-----------:|:---------:|:----------:|:--------:|:-------:|:---------:|:----------:|:------:|:-----------:|
-| 1 | 78 | 184 | 178 | 180 | 205 | 101 | 156 | 46 | 66 | 249 |
-| 2 | 168 | 333 | 347 | 186 | 327 | 188 | 275 | 76 | 147 | 251 |
-| 4 | 373 | 462 | 621 | 425 | 571 | 356 | 524 | 126 | 255 | 279 |
-| 8 | 616 | 589 | 869 | 691 | 765 | **566** | 839 | 188 | 385 | 453 |
-| 16 | 923 | 840 | 1208 | 1051 | 1158 | 255* | 1266 | **282** | 575 | 737 |
-| 32 | **1163** | **1025** | **1575** | **1452** | **1628** | 511 | **1831** | - | **748** | 1044 |
-| 64 | - | - | - | - | - | - | - | - | - | **1239** |
+| 1 | 78 | 184 | 178 | 180 | 205 | 101 | 156 | 46 | 110 | 249 |
+| 2 | 168 | 333 | 347 | 186 | 327 | 188 | 275 | 76 | 142 | 251 |
+| 4 | 373 | 462 | 621 | 425 | 571 | 356 | 524 | 126 | 161 | 279 |
+| 8 | 616 | 589 | 869 | 691 | 765 | **566** | 839 | 188 | 279 | 453 |
+| 16 | 923 | 840 | 1208 | 1051 | 1158 | 255* | 1266 | **282** | 444 | 737 |
+| 32 | **1163** | **1025** | **1575** | **1452** | **1628** | 511 | **1831** | - | 636 | 1044 |
+| 64 | - | - | - | - | - | - | - | - | **719** | **1239** |
 
 ### Reasoning Models
 | C | Qwen3-32B | Qwen3-30B-Think | DS-R1-32B | DS-R1-70B |
@@ -301,8 +306,9 @@ All raw benchmark JSON files are in `/home/llm/llm-bench/results-8xA4000/`:
 - `comparison_20260215_004318.json` - Devstral-2-123B AWQ (fp8 KV cache, 32K context)
 - `comparison_20260215_015429.json` - Magistral-Small-2509 BF16 (mistral format, 131K context)
 
-### Round 6 (Feb 15) - Small reasoning model
+### Round 6 (Feb 15) - Small reasoning model + custom quant
 - `comparison_20260215_034513.json` - Nanbeige4.1-3B BF16 (TP=4, 131K ctx, reasoning)
+- `comparison_20260215_132250.json` - EXAONE-4.0-32B custom GPTQ g32 (TP=8, Marlin+Exllama)
 
 ---
 
