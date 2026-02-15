@@ -1,81 +1,239 @@
-# Model Comparison Configuration
-# ================================
-# Configuration for compare_models.py test harness
+# Model Comparison Configuration - 8x RTX A4000
+# ================================================
+# Updated: February 14, 2026
+# Full benchmark results in CONSOLIDATED-FINDINGS.md
 #
 # Usage:
 #   python compare_models.py --config models.yaml --mode sequential
 #   python compare_models.py --config models.yaml --mode parallel
 
 # ============================================================================
-# Models to Test
+# Working Models (verified on 8x A4000)
 # ============================================================================
 models:
   # -------------------------------------------------------------------------
-  # Seed-OSS-36B (Current Setup)
+  # Nemotron-3-Nano-30B - BEST OVERALL (100% quality, fastest)
   # -------------------------------------------------------------------------
-  - name: "Seed-OSS-36B"
+  - name: "Nemotron-3-Nano-30B"
     api_url: "http://localhost:8000/v1"
-    model_id: "seed-oss"
-    context_limit: 131072  # 128K tokens
-    thinking_tag: "<seed:think>"
-    vllm_command: |
-      vllm serve Seed-OSS/Seed-OSS-36B-Instruct-AWQ \
-        --tensor-parallel-size 4 \
-        --max-model-len 131072 \
-        --gpu-memory-utilization 0.95 \
-        --enable-chunked-prefill \
-        --port 8000
+    model_id: "/home/llm/models/Nemotron-3-Nano-30B-BF16"
+    context_limit: 16384
+    thinking_tag: null
+    vllm_command: >
+      vllm serve /home/llm/models/Nemotron-3-Nano-30B-BF16
+      --tensor-parallel-size 8
+      --gpu-memory-utilization 0.90
+      --max-num-seqs 48
+      --max-model-len 16384
+      --trust-remote-code
+      --port 8000 --disable-log-requests
+    notes: "BF16 59GB, TP=8, Mamba+MoE hybrid. 205 t/s single, 1628 t/s peak"
 
   # -------------------------------------------------------------------------
-  # GLM-4.7-Flash (Z.ai / Zhipu)
+  # Qwen3-Coder-30B-A3B - BEST CODE MODEL (100% quality)
+  # -------------------------------------------------------------------------
+  - name: "Qwen3-Coder-30B-A3B"
+    api_url: "http://localhost:8000/v1"
+    model_id: "QuantTrio/Qwen3-Coder-30B-A3B-Instruct-AWQ"
+    context_limit: 32768
+    thinking_tag: null
+    vllm_command: >
+      vllm serve QuantTrio/Qwen3-Coder-30B-A3B-Instruct-AWQ
+      --tensor-parallel-size 4
+      --gpu-memory-utilization 0.90
+      --max-num-seqs 48
+      --max-model-len 32768
+      --port 8000 --disable-log-requests
+    notes: "AWQ 17GB, TP=4 (4 KV heads). 184 t/s single, 1025 t/s peak"
+
+  # -------------------------------------------------------------------------
+  # Qwen3-30B-A3B - BEST PEAK THROUGHPUT
+  # -------------------------------------------------------------------------
+  - name: "Qwen3-30B-A3B"
+    api_url: "http://localhost:8000/v1"
+    model_id: "cyankiwi/Qwen3-30B-A3B-Instruct-2507-AWQ-4bit"
+    context_limit: 32768
+    thinking_tag: null
+    vllm_command: >
+      vllm serve cyankiwi/Qwen3-30B-A3B-Instruct-2507-AWQ-4bit
+      --tensor-parallel-size 4
+      --gpu-memory-utilization 0.90
+      --max-num-seqs 48
+      --max-model-len 32768
+      --port 8000 --disable-log-requests
+    notes: "AWQ 17GB, TP=4 (4 KV heads). 178 t/s single, 1575 t/s peak"
+
+  # -------------------------------------------------------------------------
+  # GLM-4.7-Flash - BEST LONG CONTEXT (requires SGLang + dev transformers)
   # -------------------------------------------------------------------------
   - name: "GLM-4.7-Flash"
     api_url: "http://localhost:8000/v1"
-    model_id: "glm-4.7-flash"
-    context_limit: 131072  # 128K tokens
-    thinking_tag: null  # Uses different thinking mechanism
-    vllm_command: |
-      vllm serve zai-org/GLM-4.7-Flash \
-        --tensor-parallel-size 4 \
-        --max-model-len 131072 \
-        --gpu-memory-utilization 0.95 \
-        --tool-call-parser glm47 \
-        --reasoning-parser glm45 \
-        --enable-auto-tool-choice \
-        --port 8000
+    model_id: "QuantTrio/GLM-4.7-Flash-AWQ"
+    context_limit: 65536
+    thinking_tag: null
+    sglang_command: >
+      python -m sglang.launch_server
+      --model-path QuantTrio/GLM-4.7-Flash-AWQ
+      --tp 4 --port 8000
+      --mem-fraction-static 0.85
+      --kv-cache-dtype fp8_e5m2
+      --attention-backend triton
+    notes: "AWQ 19GB, TP=4 (20 heads), SGLang only. Needs transformers 5.0.0.dev0"
 
   # -------------------------------------------------------------------------
-  # Nemotron-3-Nano (NVIDIA)
+  # Devstral-Small-2-24B
   # -------------------------------------------------------------------------
-  - name: "Nemotron-3-Nano"
+  - name: "Devstral-Small-2-24B"
     api_url: "http://localhost:8000/v1"
-    model_id: "nemotron-3-nano"
-    context_limit: 1048576  # 1M tokens (!)
+    model_id: "cyankiwi/Devstral-Small-2-24B-Instruct-2512-AWQ-4bit"
+    context_limit: 32768
     thinking_tag: null
-    vllm_command: |
-      vllm serve nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8 \
-        --tensor-parallel-size 4 \
-        --max-model-len 262144 \
-        --gpu-memory-utilization 0.95 \
-        --port 8000
+    vllm_command: >
+      vllm serve cyankiwi/Devstral-Small-2-24B-Instruct-2512-AWQ-4bit
+      --tensor-parallel-size 8
+      --gpu-memory-utilization 0.90
+      --max-num-seqs 48
+      --max-model-len 32768
+      --port 8000 --disable-log-requests
+    notes: "AWQ 16GB, TP=8. Mistral3 arch. 148 t/s single, 1452 t/s peak"
+
+  # -------------------------------------------------------------------------
+  # Magistral-Small-2506 - BEST PEAK THROUGHPUT (1831 t/s!)
+  # -------------------------------------------------------------------------
+  - name: "Magistral-Small-2506"
+    api_url: "http://localhost:8000/v1"
+    model_id: "abhishekchohan/Magistral-Small-2506-AWQ"
+    context_limit: 32768
+    thinking_tag: null
+    vllm_command: >
+      vllm serve abhishekchohan/Magistral-Small-2506-AWQ
+      --tensor-parallel-size 8
+      --gpu-memory-utilization 0.90
+      --max-num-seqs 48
+      --max-model-len 32768
+      --port 8000 --disable-log-requests
+    notes: "AWQ 14GB, TP=8. Dense 24B Mistral. 156 t/s single, 1831 t/s peak"
+
+  # -------------------------------------------------------------------------
+  # Seed-OSS-36B - BEST REASONING MODEL
+  # -------------------------------------------------------------------------
+  - name: "Seed-OSS-36B"
+    api_url: "http://localhost:8000/v1"
+    model_id: "QuantTrio/Seed-OSS-36B-Instruct-AWQ"
+    context_limit: 32768
+    thinking_tag: "<seed:think>"
+    vllm_command: >
+      vllm serve QuantTrio/Seed-OSS-36B-Instruct-AWQ
+      --tensor-parallel-size 8
+      --gpu-memory-utilization 0.90
+      --max-num-seqs 48
+      --max-model-len 32768
+      --port 8000 --disable-log-requests
+      --reasoning-parser seed_oss
+    notes: "AWQ 20GB, TP=8. Dense 36B. 88 t/s single, 1163 t/s peak. ~60 t/s with reasoning"
+
+  # -------------------------------------------------------------------------
+  # Qwen3-32B - BEST QUALITY REASONING (95.5% with thinking)
+  # -------------------------------------------------------------------------
+  - name: "Qwen3-32B"
+    api_url: "http://localhost:8000/v1"
+    model_id: "Qwen/Qwen3-32B-AWQ"
+    context_limit: 32768
+    thinking_tag: "<think>"
+    vllm_command: >
+      vllm serve Qwen/Qwen3-32B-AWQ
+      --tensor-parallel-size 8
+      --gpu-memory-utilization 0.90
+      --max-num-seqs 48
+      --max-model-len 32768
+      --port 8000 --disable-log-requests
+      --reasoning-parser qwen3
+    notes: "AWQ 19GB, TP=8. Dense 32B. 78 t/s single, 1013 t/s peak. Reasoning enabled."
+
+  # -------------------------------------------------------------------------
+  # Devstral-2-123B - BEST QUALITY (100%, only model 5/5 on Stratum)
+  # -------------------------------------------------------------------------
+  - name: "Devstral-2-123B"
+    api_url: "http://localhost:8000/v1"
+    model_id: "cyankiwi/Devstral-2-123B-Instruct-2512-AWQ-4bit"
+    context_limit: 16384
+    thinking_tag: null
+    vllm_command: >
+      vllm serve cyankiwi/Devstral-2-123B-Instruct-2512-AWQ-4bit
+      --tensor-parallel-size 8
+      --gpu-memory-utilization 0.90
+      --max-num-seqs 16
+      --max-model-len 16384
+      --port 8000 --disable-log-requests
+    notes: "AWQ 78GB, TP=8. Dense 123B Ministral3. 46 t/s single, 282 t/s peak. Tight VRAM."
+
+  # -------------------------------------------------------------------------
+  # EXAONE-4.0-32B (TP=2 due to AWQ alignment, 95.5% quality)
+  # -------------------------------------------------------------------------
+  - name: "EXAONE-4.0-32B"
+    api_url: "http://localhost:8000/v1"
+    model_id: "LGAI-EXAONE/EXAONE-4.0-32B-AWQ"
+    context_limit: 32768
+    thinking_tag: null
+    vllm_command: >
+      CUDA_VISIBLE_DEVICES=0,1 vllm serve LGAI-EXAONE/EXAONE-4.0-32B-AWQ
+      --tensor-parallel-size 2
+      --gpu-memory-utilization 0.90
+      --max-num-seqs 48
+      --max-model-len 32768
+      --port 8000 --disable-log-requests
+    notes: "AWQ 18GB, TP=2 (intermediate_size alignment). 66 t/s single, 748 t/s peak."
+
+# ============================================================================
+# Reasoning Models - Poor Quality (documented for reference)
+# ============================================================================
+reasoning_poor:
+  - name: "Qwen3-30B-A3B-Thinking-2507"
+    repo: "QuantTrio/Qwen3-30B-A3B-Thinking-2507-AWQ"
+    notes: "81.8% quality - thinking hurts structured test scores. 160 t/s, TP=4."
+
+  - name: "DeepSeek-R1-Distill-Qwen-32B"
+    repo: "Valdemardi/DeepSeek-R1-Distill-Qwen-32B-AWQ"
+    notes: "54.5% quality - over-reasons, misses structured answers. 78 t/s, TP=8."
+
+  - name: "DeepSeek-R1-Distill-Llama-70B"
+    repo: "casperhansen/deepseek-r1-distill-llama-70b-awq"
+    notes: "45.5% quality - worst reasoning model. Slow (57 t/s) and inaccurate. TP=8."
+
+# ============================================================================
+# Failed / Marginal Models (documented for reference)
+# ============================================================================
+failed_models:
+  - name: "GPT-OSS-120B"
+    repo: "twhitworth/gpt-oss-120b-awq-w4a16"
+    failure: "OOM - repo is actually FP16 (no quantization_config), 15.6GB/GPU"
+
+  - name: "GLM-4.5-Air"
+    repo: "cyankiwi/GLM-4.5-Air-AWQ-4bit"
+    failure: "Marlin kernel error: size_n=2736 not divisible by tile_n=64"
+
+  - name: "Qwen3-Next-80B-A3B"
+    repo: "cyankiwi/Qwen3-Next-80B-A3B-Instruct-AWQ-4bit"
+    failure: "OOM - 2 KV heads (max TP=2), 49GB needs 24.5GB/GPU"
+
+  - name: "Qwen3-30B-A3B (stelterlab)"
+    repo: "stelterlab/Qwen3-30B-A3B-Instruct-2507-AWQ"
+    failure: "CUDA illegal memory access during CUDA graph compilation"
+
+  - name: "GPT-OSS-20B"
+    repo: "openai/gpt-oss-20b"
+    status: "marginal"
+    notes: "Works with --enforce-eager but quality scoring broken (reasoning parser)"
+
+  - name: "Qwen3-480B-Coder"
+    failure: "Not attempted - ~236GB exceeds 128GB VRAM"
 
 # ============================================================================
 # Test Configuration
 # ============================================================================
 tests:
-  # Standard benchmark (46 tests)
   standard:
     enabled: true
-    script: "benchmark.py"
-    categories:
-      - code
-      - reasoning
-      - knowledge
-      - tool_use
-      - speed
-      - context
-
-  # Practical debugging tests (your mining pool bugs)
   practical:
     enabled: true
     scripts:
@@ -84,34 +242,17 @@ tests:
       - "practical/expert_test.py"
       - "practical/nightmare_test.py"
       - "practical/hiveos_wrapper_test.py"
-
-  # Long context tests
   long_context:
     enabled: true
     script: "long_context_test.py"
-    context_sizes:
-      - 32000    # 32K - baseline
-      - 64000    # 64K
-      - 128000   # 128K - Seed/GLM limit
-      - 256000   # 256K - only Nemotron
-      - 512000   # 512K - only Nemotron
+
+output_dir: "./results-8xA4000"
+timeout: 600
+temperature: 0.0
 
 # ============================================================================
-# Output Configuration
+# Framework Notes
 # ============================================================================
-output_dir: "./comparison_results"
-timeout: 600  # 10 minutes per test
-temperature: 0.0  # Deterministic for reproducibility
-
-# ============================================================================
-# Hardware Reference (for documentation)
-# ============================================================================
-# Your setup:
-#   - 6× RTX A4000 (16GB each = 96GB total)
-#   - H12D-8D: 4× PCIe 4.0 x16 slots
-#   - H11SSL: 4× PCIe 3.0 x16 + 2× PCIe 3.0 x8 slots
-#
-# Model VRAM requirements:
-#   - Seed-OSS-36B-AWQ: ~63GB (fits 4 cards)
-#   - GLM-4.7-Flash BF16: ~60GB (fits 4 cards)
-#   - Nemotron-3-Nano-FP8: ~32GB (fits 2-4 cards)
+# vLLM 0.14 models: transformers==4.57.1
+# SGLang models (GLM): transformers 5.0.0.dev0
+# Must swap transformers when switching frameworks

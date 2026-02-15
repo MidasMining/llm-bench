@@ -1409,11 +1409,11 @@ def print_comparison_report(results: List[ModelResults]):
     print("=" * 72)
 
 
-def save_results(results: List[ModelResults], output_dir: str):
+def save_results(results: List[ModelResults], output_dir: str, server_config: Dict[str, Any] = None):
     """Save results to JSON and Markdown files."""
     os.makedirs(output_dir, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    
+
     # JSON output
     json_path = os.path.join(output_dir, f"comparison_{timestamp}.json")
     data = []
@@ -1423,6 +1423,7 @@ def save_results(results: List[ModelResults], output_dir: str):
             "api_url": model.api_url,
             "timestamp": model.timestamp,
             "gpu_info": model.gpu_info,
+            "server_config": server_config or {},
             "sequential": {
                 "tests": [
                     {
@@ -1445,7 +1446,7 @@ def save_results(results: List[ModelResults], output_dir: str):
     with open(json_path, 'w') as f:
         json.dump(data, f, indent=2)
     print(f"\nResults saved to: {json_path}")
-    
+
     return json_path
 
 
@@ -1498,6 +1499,19 @@ Examples:
     parser.add_argument('--max-concurrent', type=int, default=32,
                        help='Maximum concurrency for parallel tests (default: 32)')
     parser.add_argument('--version', action='version', version=f'%(prog)s {VERSION}')
+
+    # Server config metadata (recorded in JSON output for reproducibility)
+    server_group = parser.add_argument_group('server config', 'Server config metadata recorded in results JSON')
+    server_group.add_argument('--tp', type=int, help='Tensor parallel size used')
+    server_group.add_argument('--kv-cache-dtype', type=str, help='KV cache dtype (e.g. auto, fp8_e5m2)')
+    server_group.add_argument('--attention-backend', type=str, help='Attention backend (e.g. flashinfer, flash_attn, triton)')
+    server_group.add_argument('--gpu-mem-util', type=float, help='GPU memory utilization (e.g. 0.90)')
+    server_group.add_argument('--max-model-len', type=int, help='Max model context length')
+    server_group.add_argument('--max-num-seqs', type=int, help='Max concurrent sequences')
+    server_group.add_argument('--framework', type=str, help='Inference framework (e.g. vllm, sglang)')
+    server_group.add_argument('--framework-version', type=str, help='Framework version')
+    server_group.add_argument('--quant-method', type=str, help='Quantization method (e.g. awq, gptq, bf16, mxfp4)')
+    server_group.add_argument('--notes', type=str, help='Free-form notes about this run')
     
     args = parser.parse_args()
     
@@ -1532,9 +1546,53 @@ Examples:
     # Detect GPU
     gpu_info = detect_gpu()
 
+    # Build server config metadata
+    server_config = {}
+    if args.tp is not None:
+        server_config['tensor_parallel_size'] = args.tp
+    if args.kv_cache_dtype:
+        server_config['kv_cache_dtype'] = args.kv_cache_dtype
+    if args.attention_backend:
+        server_config['attention_backend'] = args.attention_backend
+    if args.gpu_mem_util is not None:
+        server_config['gpu_memory_utilization'] = args.gpu_mem_util
+    if args.max_model_len is not None:
+        server_config['max_model_len'] = args.max_model_len
+    if args.max_num_seqs is not None:
+        server_config['max_num_seqs'] = args.max_num_seqs
+    if args.quant_method:
+        server_config['quant_method'] = args.quant_method
+    if args.notes:
+        server_config['notes'] = args.notes
+
+    # Auto-detect framework version if not provided
+    framework = args.framework
+    framework_version = args.framework_version
+    if not framework:
+        try:
+            import vllm
+            framework = 'vllm'
+            framework_version = framework_version or vllm.__version__
+        except ImportError:
+            pass
+        if not framework:
+            try:
+                import sglang
+                framework = 'sglang'
+                framework_version = framework_version or getattr(sglang, '__version__', 'unknown')
+            except ImportError:
+                pass
+    if framework:
+        server_config['framework'] = framework
+    if framework_version:
+        server_config['framework_version'] = framework_version
+
     print(f"\n{C.BOLD}{C.HEADER}Model Comparison Test Harness v{VERSION}{C.RESET}")
     if gpu_info['detected']:
         print(f"GPU: {gpu_info['name']} ({gpu_info['memory_mb']}MB)")
+    if server_config:
+        cfg_str = ', '.join(f"{k}={v}" for k, v in server_config.items() if k != 'notes')
+        print(f"Config: {cfg_str}")
     print(f"Tests: {', '.join(tests_to_run)}")
     print(f"Models: {len(config['models'])}")
     if args.parallel or args.parallel_only:
@@ -1617,7 +1675,7 @@ Examples:
         print_comparison_report(all_results)
     
     # Save results
-    save_results(all_results, args.output)
+    save_results(all_results, args.output, server_config=server_config)
     
     print(f"\n{C.PASS}Done!{C.RESET}")
 
