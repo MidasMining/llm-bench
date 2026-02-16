@@ -101,6 +101,7 @@ Comprehensive benchmarking suite for evaluating local LLM models on real-world c
 | Qwen3-Next-80B-A3B AWQ | 2 KV heads (max TP=2), 24.5GB/GPU exceeds 16GB |
 | Qwen3-Coder-Next AWQ | 2 KV heads (max TP=2), needs vLLM 0.15+ |
 | EXAONE-4.0-32B AWQ/GPTQ g128 | Marlin min_thread_k=128 alignment fails at TP>2 (3424%128≠0). Fixed with custom GPTQ g32 |
+| Qwen3-480B-Coder AWQ | 236GB model, 128GB VRAM. At TP=8: 29.5GB/GPU needed vs 14.7GB available. Needs ~500GB VRAM. |
 
 ---
 

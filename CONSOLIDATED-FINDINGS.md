@@ -61,7 +61,7 @@
 | Qwen3-Coder-Next | AWQ | ~45GB | Won't fit | 2 KV heads (max TP=2), needs vLLM 0.15+ |
 | EXAONE-4.0-32B | AWQ | 18GB | TP limited | intermediate_size=27392 not AWQ-aligned at TP>2 |
 | Qwen3-30B-A3B (stelterlab) | AWQ | ~17GB | CUDA error | Illegal memory access during CUDA graph compile |
-| Qwen3-480B-Coder | AWQ | ~236GB | Not attempted | Exceeds 128GB total VRAM |
+| Qwen3-480B-Coder | AWQ | 236GB | Won't fit | 480B MoE (160E/8A), 62 layers, 96Q/8KV heads. At TP=8: 29.5GB/GPU needed vs 14.7GB available (1.85x over). Needs ~500GB VRAM minimum (with KV cache). |
 
 ---
 
