@@ -30,24 +30,25 @@ Comprehensive benchmarking suite for evaluating local LLM models on real-world c
 | 2 | **Nemotron-3-Nano-30B** | BF16 | 8 | **100%** (22/22) | **205** | **1628** @ C=32 | 16K | vLLM |
 | 3 | **Qwen3-Coder-30B-A3B** | AWQ | 4 | **100%** (22/22) | 184 | 1025 @ C=32 | 32K | vLLM |
 | 4 | **GLM-4.7-Flash** | AWQ | 4 | **100%** (22/22) | 101 | 566 @ C=8 | 65K | SGLang |
-| 5 | **Magistral-Small-2509** | AWQ | 8 | 95.5% (21/22) | 144 | 1470 @ C=64 | 32K | vLLM |
-| 6 | **Magistral-Small-2506** | AWQ | 8 | 95.5% (21/22) | 156 | **1831** @ C=32 | 32K | vLLM |
-| 7 | Qwen3-32B | AWQ | 8 | 95.5% (21/22) | 78 | 1013 @ C=32 | 32K | vLLM |
-| 8 | EXAONE-4.0-32B | GPTQ g32 | 8 | 95.5% (21/22) | 110 | 719 @ C=64 | 131K | vLLM |
-| 9 | Qwen3-30B-A3B | AWQ | 4 | 95.5% (21/22) | 178 | 1575 @ C=32 | 32K | vLLM |
-| 10 | Devstral-Small-2-24B | AWQ | 8 | 95.5% (21/22) | 148 | 1452 @ C=32 | 32K | vLLM |
-| 11 | Seed-OSS-36B | AWQ | 8 | 90.9% (20/22) | 88 | 1163 @ C=32 | 32K | vLLM |
-| 12 | Qwen3-30B-A3B-Thinking | AWQ | 4 | 81.8% (18/22) | 160 | 1031 @ C=32 | 32K | vLLM |
-| 13 | **Nanbeige4.1-3B** | BF16 | 4 | 77.3% (17/22) | 187 | 1239 @ C=64 | 131K | vLLM |
-| 14 | DS-R1-Distill-Qwen-32B | AWQ | 8 | 54.5% (12/22) | 78 | 992 @ C=32 | 32K | vLLM |
-| 15 | DS-R1-Distill-Llama-70B | AWQ | 8 | 45.5% (10/22) | 57 | 540 @ C=32 | 16K | vLLM |
-| 16 | GPT-OSS-20B | MXFP4 | 8 | 40.9% (9/22) | 52 | 933 @ C=16 | 8K | vLLM |
+| 5 | **GLM-4.5-Air** | AWQ FP16Mix | 8 | 95.5% (21/22) | 87 | 724 @ C=64 | 8K | vLLM |
+| 6 | **Magistral-Small-2509** | AWQ | 8 | 95.5% (21/22) | 144 | 1470 @ C=64 | 32K | vLLM |
+| 7 | **Magistral-Small-2506** | AWQ | 8 | 95.5% (21/22) | 156 | **1831** @ C=32 | 32K | vLLM |
+| 8 | Qwen3-32B | AWQ | 8 | 95.5% (21/22) | 78 | 1013 @ C=32 | 32K | vLLM |
+| 9 | EXAONE-4.0-32B | GPTQ g32 | 8 | 95.5% (21/22) | 110 | 719 @ C=64 | 131K | vLLM |
+| 10 | Qwen3-30B-A3B | AWQ | 4 | 95.5% (21/22) | 178 | 1575 @ C=32 | 32K | vLLM |
+| 11 | Devstral-Small-2-24B | AWQ | 8 | 95.5% (21/22) | 148 | 1452 @ C=32 | 32K | vLLM |
+| 12 | Seed-OSS-36B | AWQ | 8 | 90.9% (20/22) | 88 | 1163 @ C=32 | 32K | vLLM |
+| 13 | Qwen3-30B-A3B-Thinking | AWQ | 4 | 81.8% (18/22) | 160 | 1031 @ C=32 | 32K | vLLM |
+| 14 | **Nanbeige4.1-3B** | BF16 | 4 | 77.3% (17/22) | 187 | 1239 @ C=64 | 131K | vLLM |
+| 15 | DS-R1-Distill-Qwen-32B | AWQ | 8 | 54.5% (12/22) | 78 | 992 @ C=32 | 32K | vLLM |
+| 16 | DS-R1-Distill-Llama-70B | AWQ | 8 | 45.5% (10/22) | 57 | 540 @ C=32 | 16K | vLLM |
+| 17 | GPT-OSS-20B | MXFP4 | 8 | 40.9% (9/22) | 52 | 933 @ C=16 | 8K | vLLM |
 
 ### Category Winners
 
 | Category | Model | Why |
 |----------|-------|-----|
-| **Best Quality** | Devstral-2-123B | Only model to score 5/5 on Stratum byte order test |
+| **Best Quality** | Devstral-2-123B | 100% quality (22/22). 5/5 Stratum also achieved by: Nemotron, Qwen3-Coder, GLM-4.7-Flash, GLM-4.5-Air |
 | **Best Overall** | Nemotron-3-Nano-30B | 100% quality + 205 t/s single + 1628 t/s peak |
 | **Best Code Model** | Qwen3-Coder-30B-A3B | 100% quality, purpose-built for code tasks |
 | **Best Throughput** | Magistral-Small-2506 AWQ | 1831 t/s peak, 95.5% quality, only 14GB |
@@ -62,6 +63,7 @@ Comprehensive benchmarking suite for evaluating local LLM models on real-world c
 | Nemotron-3-Nano-30B | 2/2 | 3/3 | 4/4 | **5/5** | 8/8 | **22/22** |
 | Qwen3-Coder-30B-A3B | 2/2 | 3/3 | 4/4 | **5/5** | 8/8 | **22/22** |
 | GLM-4.7-Flash | 2/2 | 3/3 | 4/4 | **5/5** | 8/8 | **22/22** |
+| GLM-4.5-Air | 2/2 | 3/3 | 3/4 | **5/5** | 8/8 | 21/22 |
 | Magistral-Small-2509 | 2/2 | 3/3 | 4/4 | 4/5 | 8/8 | 21/22 |
 | Magistral-Small-2506 | 2/2 | 3/3 | 4/4 | 4/5 | 8/8 | 21/22 |
 | Qwen3-32B | 2/2 | 3/3 | 4/4 | 4/5 | 8/8 | 21/22 |
@@ -77,22 +79,22 @@ Comprehensive benchmarking suite for evaluating local LLM models on real-world c
 
 ### Throughput Scaling (tokens/second)
 
-| Concurrency | Nemotron | Mag-2506 | Mag-2509 | Qwen3-30B | Devstral-S | Nanbeige-3B | Seed-OSS | Qwen3-Coder | Qwen3-32B | EXAONE | Devstral-2 |
-|:-----------:|:--------:|:--------:|:--------:|:---------:|:----------:|:-----------:|:--------:|:-----------:|:---------:|:------:|:----------:|
-| 1 | 205 | 156 | 144 | 178 | 180 | 249 | 78 | 184 | 78 | 110 | 41 |
-| 2 | 327 | 275 | 387 | 347 | 186 | 251 | 168 | 333 | 170 | 142 | 82 |
-| 4 | 571 | 524 | 281 | 621 | 425 | 279 | 373 | 462 | 331 | 161 | 124 |
-| 8 | 765 | 839 | 486 | 869 | 691 | 453 | 616 | 589 | 571 | 279 | 185 |
-| 16 | 1158 | 1266 | 827 | 1208 | 1051 | 737 | 923 | 840 | 825 | 444 | 271 |
-| **32** | **1628** | **1831** | 1238 | **1575** | **1452** | 1044 | **1163** | **1025** | **1013** | 636 | **300** |
-| **64** | - | - | **1470** | - | - | **1239** | - | - | - | **719** | - |
+| Concurrency | Nemotron | Mag-2506 | Mag-2509 | Qwen3-30B | Devstral-S | Nanbeige-3B | Seed-OSS | Qwen3-Coder | GLM-4.5 | Qwen3-32B | EXAONE | Devstral-2 |
+|:-----------:|:--------:|:--------:|:--------:|:---------:|:----------:|:-----------:|:--------:|:-----------:|:-------:|:---------:|:------:|:----------:|
+| 1 | 205 | 156 | 144 | 178 | 180 | 249 | 78 | 184 | 119 | 78 | 110 | 41 |
+| 2 | 327 | 275 | 387 | 347 | 186 | 251 | 168 | 333 | 122 | 170 | 142 | 82 |
+| 4 | 571 | 524 | 281 | 621 | 425 | 279 | 373 | 462 | 150 | 331 | 161 | 124 |
+| 8 | 765 | 839 | 486 | 869 | 691 | 453 | 616 | 589 | 241 | 571 | 279 | 185 |
+| 16 | 1158 | 1266 | 827 | 1208 | 1051 | 737 | 923 | 840 | 350 | 825 | 444 | 271 |
+| **32** | **1628** | **1831** | 1238 | **1575** | **1452** | 1044 | **1163** | **1025** | 523 | **1013** | 636 | **300** |
+| **64** | - | - | **1470** | - | - | **1239** | - | - | **724** | - | **719** | - |
 
 ### Failed / Incompatible Models
 
 | Model | Issue |
 |-------|-------|
-| GPT-OSS-120B FP16 | OOM - repo is actually FP16, not quantized (15.6GB/GPU) |
-| GLM-4.5-Air AWQ | Marlin kernel error: `size_n=2736 not divisible by tile_n=64` |
+| GPT-OSS-120B "AWQ" | twhitworth repo: only 6/36 layers present, FP16 not AWQ. No viable quant exists. |
+| ~~GLM-4.5-Air AWQ~~ | ~~Marlin error~~ **FIXED**: QuantTrio FP16Mix + `--enable-expert-parallel` → 95.5%, 5/5 Stratum |
 | Qwen3-Next-80B-A3B AWQ | 2 KV heads (max TP=2), 24.5GB/GPU exceeds 16GB |
 | Qwen3-Coder-Next AWQ | 2 KV heads (max TP=2), needs vLLM 0.15+ |
 | EXAONE-4.0-32B AWQ/GPTQ g128 | Marlin min_thread_k=128 alignment fails at TP>2 (3424%128≠0). Fixed with custom GPTQ g32 |
@@ -147,6 +149,7 @@ At only 3B parameters (~6GB BF16), Nanbeige4.1-3B scores 77.3% - matching EXAONE
 | GPT-OSS-20B | 64 | 8 | 8 | MoE | enforce-eager only |
 | Qwen3-30B-A3B | 32 | 4 | 4 | MoE | 128 experts, 8 active |
 | Qwen3-Coder-30B-A3B | 32 | 4 | 4 | MoE | 128 experts, 8 active |
+| GLM-4.5-Air | 96 | 8 | 8 | MoE | 128E/8A, needs --enable-expert-parallel, QuantTrio FP16Mix |
 | GLM-4.7-Flash | 20 | 20 | 4 | MoE | SGLang only |
 | Nanbeige4.1-3B | 20 | 4 | 4 | Dense | 3B reasoning, fits single GPU |
 | EXAONE-4.0-32B | 40 | 8 | 8 | Dense | Custom GPTQ g32 + float16 for TP=8 |

@@ -14,6 +14,7 @@
 | **Nemotron-3-Nano-30B** | BF16 | 8 | No | **100%** (22/22) | **205** | 1628 @ C=32 | 16K |
 | **Qwen3-Coder-30B-A3B** | AWQ | 4 | No | **100%** (22/22) | 184 | 1025 @ C=32 | 32K |
 | **GLM-4.7-Flash** | AWQ | 4 | No | **100%** (22/22) | 101 | 566 @ C=8 | 65K |
+| **GLM-4.5-Air** | AWQ FP16Mix | 8 | Yes∥ | **95.5%** (21/22) | 87 | 724 @ C=64 | 8K‖ |
 | **Magistral-Small-2509** | AWQ | 8 | Yes§ | **95.5%** (21/22) | 144 | 1470 @ C=64 | 32K |
 | Magistral-Small-2509 | BF16 | 8 | Yes§ | 95.5% (21/22) | 88 | 1071 @ C=32 | 131K |
 | **Magistral-Small-2506** | AWQ | 8 | No* | **95.5%** (21/22) | 156 | **1831** @ C=32 | 32K |
@@ -34,6 +35,8 @@
 † Devstral-2-123B: 32K context / 32 max-seqs with fp8 KV cache (was 16K/16 without). Requires compressed-tensors patch.
 ‡ EXAONE has `<think>` tokens but not in chat template; limited to TP=2 (AWQ intermediate_size alignment)
 ¶ Nanbeige4.1-3B uses `<think>` tags (Qwen3-style reasoning), only 3B params, LlamaForCausalLM architecture
+∥ GLM-4.5-Air uses `<think>` reasoning tags, 106B total / 12B active (MoE 128E/8A), QuantTrio AWQ FP16Mix with padded intermediate_size=11264
+‖ GLM-4.5-Air context limited to 8K due to 69GB model at TP=8 leaving minimal KV cache headroom
 
 ### Category Winners
 
@@ -51,8 +54,7 @@
 
 | Model | Quant | Size | Failure | Error |
 |-------|-------|------|---------|-------|
-| GPT-OSS-120B | FP16*** | ~33GB | OOM | Repo is actually FP16 (no quantization_config), 15.6GB/GPU |
-| GLM-4.5-Air | AWQ | ~59GB | Kernel error | Marlin: `size_n=2736 not divisible by tile_n=64` |
+| GPT-OSS-120B | "AWQ"*** | ~33GB | Broken | twhitworth repo: only 6/36 layers, FP16 not AWQ. No real quant exists. |
 | Qwen3-Next-80B-A3B | AWQ | ~49GB | OOM | 2 KV heads (max TP=2), 24.5GB/GPU exceeds 16GB |
 | Qwen3-Coder-Next | AWQ | ~45GB | Won't fit | 2 KV heads (max TP=2), needs vLLM 0.15+ |
 | EXAONE-4.0-32B | AWQ | 18GB | TP limited | intermediate_size=27392 not AWQ-aligned at TP>2 |
@@ -145,7 +147,22 @@
 - Failed: atomicity bug (Payment), memory leak pruning (Stratum), some HiveOS wrapper checks
 - **Best use case**: Edge deployment, resource-constrained environments, or high-throughput reasoning at minimal cost
 
-### 12. The "2 KV Head Problem" Blocks Many New Models
+### 12. GLM-4.5-Air: Previously Failed, Now Working with Expert Parallel
+- Original failure: `Marlin: size_n=2736 not divisible by tile_n=64` (intermediate_size=10944/4=2736)
+- **Fix**: QuantTrio AWQ FP16Mix pads intermediate_size to 11264 + `--enable-expert-parallel` avoids MoE TP sharding
+- 95.5% quality with **5/5 Stratum** (byte order found!) and `<think>` reasoning
+- 87 t/s single, 724 t/s peak @ C=64 (limited by 8K context, 69GB model fills 128GB VRAM)
+- 106B total / 12B active (MoE 128E/8A), same family as GLM-4.7-Flash but much larger
+- Only 5th model to achieve 5/5 on Stratum Protocol (joins Devstral-2, Nemotron, Qwen3-Coder, GLM-4.7-Flash)
+
+### 13. GPT-OSS-120B: No Viable Quantization Exists
+- `twhitworth/gpt-oss-120b-awq-w4a16`: BROKEN - only 6/36 layers present, weights are FP16 not AWQ
+- `unieai/gpt-oss-120b-awq`: Empty README, untested
+- Original model is MXFP4 (needs SM89+ Hopper), FP16 version is 234 GB
+- Custom quantization would require dequantizing MXFP4→FP16 first, then AWQ/GPTQ
+- Non-standard module naming (ColumnLinear, RowLinear, GatedMLP) makes standard quant tools fail
+
+### 14. The "2 KV Head Problem" Blocks Many New Models
 - Qwen3-Next-80B, Qwen3-Coder-Next, MiniCPM-SALA all have only 2 KV heads
 - Max TP=2, making them impractical on multi-GPU setups with 16GB/card
 - This is a growing trend in newer architectures (linear attention, DeltaNet hybrids)
@@ -219,6 +236,7 @@ vllm serve abhishekchohan/Magistral-Small-2506-AWQ \
 | Qwen3-Coder-30B-A3B | 32 | 4 | 4 | 4 | MoE | 128E/8A |
 | Qwen3-30B-A3B-Thinking | 32 | 4 | 4 | 4 | MoE | Thinking variant |
 | GLM-4.7-Flash | 20 | 20 | 4 | 4 | MoE | SGLang only |
+| GLM-4.5-Air | 96 | 8 | 8 | 8 | MoE | 128E/8A, QuantTrio FP16Mix, expert parallel required |
 | Nanbeige4.1-3B | 20 | 4 | 4 | 4 | Dense | 3B reasoning model, LlamaForCausalLM |
 | EXAONE-4.0-32B | 40 | 8 | 8* | 8 | Dense | Custom GPTQ g32 unlocks TP=8 (Marlin+Exllama hybrid) |
 
@@ -238,13 +256,13 @@ vllm serve abhishekchohan/Magistral-Small-2506-AWQ \
 | 64 | - | - | - | - | - | - | - | **1470** | - | **719** | **1239** |
 
 ### Reasoning Models
-| C | Qwen3-32B | Qwen3-30B-Think | DS-R1-32B | DS-R1-70B |
-|:-:|:---------:|:---------------:|:---------:|:---------:|
-| 1 | 78 | 160 | 78 | 57 |
-| 2 | 170 | 300 | 172 | 115 |
-| 4 | 331 | 438 | 333 | 230 |
-| 8 | 571 | 648 | 564 | 335 |
-| 16 | 825 | 841 | 799 | 432 |
+| C | Qwen3-32B | Qwen3-30B-Think | GLM-4.5-Air | DS-R1-32B | DS-R1-70B |
+|:-:|:---------:|:---------------:|:-----------:|:---------:|:---------:|
+| 1 | 78 | 160 | 119 | 78 | 57 |
+| 2 | 170 | 300 | 122 | 172 | 115 |
+| 4 | 331 | 438 | 150 | 333 | 230 |
+| 8 | 571 | 648 | 241 | 564 | 335 |
+| 16 | 825 | 841 | 350 | 799 | 432 |
 | 32 | **1013** | **1031** | **992** | **540** |
 
 \* GLM-4.7-Flash throughput drops at C=16 due to CUDA graph cliff on SGLang TP=4
@@ -257,6 +275,7 @@ vllm serve abhishekchohan/Magistral-Small-2506-AWQ \
 |-------|---------|----------------|---------------|-------------------|-----------------|
 | **Seed-OSS-36B** | 90.9% | `<seed:think>` tags | ~60 t/s | Good - methodical analysis | Good |
 | **Qwen3-32B** | 95.5% | `<think>` tags | ~78 t/s total | Good | Good |
+| **GLM-4.5-Air** | 95.5% | `<think>` tags | ~87 t/s total | Good | Good (5/5 Stratum) |
 | Qwen3-30B-A3B-Think | 81.8% | `<think>` tags | ~160 t/s total | Decent | Weak on some |
 | DS-R1-Distill-Qwen-32B | 54.5% | `<think>` tags | ~78 t/s total | Verbose | Poor |
 | **Nanbeige4.1-3B** | 77.3% | `<think>` tags | ~187 t/s total | Decent - concise | Decent |
@@ -316,6 +335,8 @@ All raw benchmark JSON files are in `/home/llm/llm-bench/results-8xA4000/`:
 - `comparison_20260215_132250.json` - EXAONE-4.0-32B custom GPTQ g32 (TP=8, Marlin+Exllama)
 - `comparison_20260215_182901.json` - Magistral-Small-2509 custom AWQ (TP=8, text extraction from multimodal)
 - `parallel_benchmark_20260215_183127.json` - Magistral-Small-2509 AWQ throughput
+- `comparison_20260215_192057.json` - GLM-4.5-Air AWQ FP16Mix (TP=8, expert parallel)
+- `parallel_benchmark_20260215_192351.json` - GLM-4.5-Air throughput
 
 ---
 
