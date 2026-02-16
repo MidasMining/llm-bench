@@ -27,33 +27,35 @@ Comprehensive benchmarking suite for evaluating local LLM models on real-world c
 | # | Model | Quant | TP | Quality | Single t/s | Peak t/s | Context | Framework |
 |---|-------|-------|-----|---------|-----------|----------|---------|-----------|
 | 1 | **Devstral-2-123B** | AWQ | 8 | **100%** (22/22) | 41 | 300 @ C=32 | 32K | vLLM |
-| 2 | **Nemotron-3-Nano-30B** | BF16 | 8 | **100%** (22/22) | **205** | **1628** @ C=32 | 16K | vLLM |
+| 2 | **Nemotron-3-Nano-30B** | BF16 | 8 | **100%** (22/22) | **262** | 1307 @ C=64 | 16K | vLLM |
 | 3 | **Qwen3-Coder-30B-A3B** | AWQ | 4 | **100%** (22/22) | 184 | 1025 @ C=32 | 32K | vLLM |
 | 4 | **GLM-4.7-Flash** | AWQ | 4 | **100%** (22/22) | 101 | 566 @ C=8 | 65K | SGLang |
 | 5 | **GLM-4.5-Air** | AWQ FP16Mix | 8 | 95.5% (21/22) | 87 | 724 @ C=64 | 8K | vLLM |
 | 6 | **Magistral-Small-2509** | AWQ | 8 | 95.5% (21/22) | 144 | 1470 @ C=64 | 32K | vLLM |
 | 7 | **Magistral-Small-2506** | AWQ | 8 | 95.5% (21/22) | 156 | **1831** @ C=32 | 32K | vLLM |
-| 8 | Qwen3-32B | AWQ | 8 | 95.5% (21/22) | 78 | 1013 @ C=32 | 32K | vLLM |
-| 9 | EXAONE-4.0-32B | GPTQ g32 | 8 | 95.5% (21/22) | 110 | 719 @ C=64 | 131K | vLLM |
-| 10 | Qwen3-30B-A3B | AWQ | 4 | 95.5% (21/22) | 178 | 1575 @ C=32 | 32K | vLLM |
-| 11 | Devstral-Small-2-24B | AWQ | 8 | 95.5% (21/22) | 148 | 1452 @ C=32 | 32K | vLLM |
-| 12 | Seed-OSS-36B | AWQ | 8 | 90.9% (20/22) | 88 | 1163 @ C=32 | 32K | vLLM |
-| 13 | Qwen3-30B-A3B-Thinking | AWQ | 4 | 81.8% (18/22) | 160 | 1031 @ C=32 | 32K | vLLM |
-| 14 | **Nanbeige4.1-3B** | BF16 | 4 | 77.3% (17/22) | 187 | 1239 @ C=64 | 131K | vLLM |
-| 15 | DS-R1-Distill-Qwen-32B | AWQ | 8 | 54.5% (12/22) | 78 | 992 @ C=32 | 32K | vLLM |
-| 16 | DS-R1-Distill-Llama-70B | AWQ | 8 | 45.5% (10/22) | 57 | 540 @ C=32 | 16K | vLLM |
-| 17 | GPT-OSS-20B | MXFP4 | 8 | 40.9% (9/22) | 52 | 933 @ C=16 | 8K | vLLM |
+| 8 | **QwQ-32B** | AWQ | 8 | 95.5% (21/22) | 102 | 733 @ C=64 | 16K | vLLM |
+| 9 | Qwen3-32B | AWQ | 8 | 95.5% (21/22) | 78 | 1013 @ C=32 | 32K | vLLM |
+| 10 | EXAONE-4.0-32B | GPTQ g32 | 8 | 95.5% (21/22) | 110 | 719 @ C=64 | 131K | vLLM |
+| 11 | Qwen3-30B-A3B | AWQ | 4 | 95.5% (21/22) | 178 | 1575 @ C=32 | 32K | vLLM |
+| 12 | Devstral-Small-2-24B | AWQ | 8 | 95.5% (21/22) | 148 | 1452 @ C=32 | 32K | vLLM |
+| 13 | Seed-OSS-36B | AWQ | 8 | 90.9% (20/22) | 88 | 1163 @ C=32 | 32K | vLLM |
+| 14 | Qwen3-30B-A3B-Thinking | AWQ | 4 | 81.8% (18/22) | 160 | 1031 @ C=32 | 32K | vLLM |
+| 15 | **Nanbeige4.1-3B** | BF16 | 4 | 77.3% (17/22) | 187 | 1239 @ C=64 | 131K | vLLM |
+| 16 | DS-R1-Distill-Qwen-32B | AWQ | 8 | 54.5% (12/22) | 78 | 992 @ C=32 | 32K | vLLM |
+| 17 | DS-R1-Distill-Llama-70B | AWQ | 8 | 45.5% (10/22) | 57 | 540 @ C=32 | 16K | vLLM |
+| 18 | GPT-OSS-20B | MXFP4 | 8 | 40.9% (9/22) | 52 | 933 @ C=16 | 8K | vLLM |
 
 ### Category Winners
 
 | Category | Model | Why |
 |----------|-------|-----|
 | **Best Quality** | Devstral-2-123B | 100% quality (22/22). 5/5 Stratum also achieved by: Nemotron, Qwen3-Coder, GLM-4.7-Flash, GLM-4.5-Air |
-| **Best Overall** | Nemotron-3-Nano-30B | 100% quality + 205 t/s single + 1628 t/s peak |
+| **Best Overall** | Nemotron-3-Nano-30B | 100% quality + hidden reasoning + 262 t/s single + 1307 t/s peak |
 | **Best Code Model** | Qwen3-Coder-30B-A3B | 100% quality, purpose-built for code tasks |
 | **Best Throughput** | Magistral-Small-2506 AWQ | 1831 t/s peak, 95.5% quality, only 14GB |
 | **Best Long Context** | Magistral-Small-2509 | 131K context, 95.5% quality, working reasoning |
-| **Best Reasoning** | Qwen3-32B | 95.5% quality with `<think>` mode |
+| **Best Reasoning** | Nemotron-3-Nano-30B | 100% quality, hidden `<think>` mode enabled by default, 262 t/s |
+| **Best Reasoning (Runner-up)** | QwQ-32B | 95.5% quality with `<think>` mode, 102 t/s |
 
 ### Detailed Test Results
 
@@ -63,6 +65,7 @@ Comprehensive benchmarking suite for evaluating local LLM models on real-world c
 | Nemotron-3-Nano-30B | 2/2 | 3/3 | 4/4 | **5/5** | 8/8 | **22/22** |
 | Qwen3-Coder-30B-A3B | 2/2 | 3/3 | 4/4 | **5/5** | 8/8 | **22/22** |
 | GLM-4.7-Flash | 2/2 | 3/3 | 4/4 | **5/5** | 8/8 | **22/22** |
+| QwQ-32B | 2/2 | 3/3 | 4/4 | 4/5 | 8/8 | 21/22 |
 | GLM-4.5-Air | 2/2 | 3/3 | 3/4 | **5/5** | 8/8 | 21/22 |
 | Magistral-Small-2509 | 2/2 | 3/3 | 4/4 | 4/5 | 8/8 | 21/22 |
 | Magistral-Small-2506 | 2/2 | 3/3 | 4/4 | 4/5 | 8/8 | 21/22 |
@@ -79,15 +82,15 @@ Comprehensive benchmarking suite for evaluating local LLM models on real-world c
 
 ### Throughput Scaling (tokens/second)
 
-| Concurrency | Nemotron | Mag-2506 | Mag-2509 | Qwen3-30B | Devstral-S | Nanbeige-3B | Seed-OSS | Qwen3-Coder | GLM-4.5 | Qwen3-32B | EXAONE | Devstral-2 |
-|:-----------:|:--------:|:--------:|:--------:|:---------:|:----------:|:-----------:|:--------:|:-----------:|:-------:|:---------:|:------:|:----------:|
-| 1 | 205 | 156 | 144 | 178 | 180 | 249 | 78 | 184 | 119 | 78 | 110 | 41 |
-| 2 | 327 | 275 | 387 | 347 | 186 | 251 | 168 | 333 | 122 | 170 | 142 | 82 |
-| 4 | 571 | 524 | 281 | 621 | 425 | 279 | 373 | 462 | 150 | 331 | 161 | 124 |
-| 8 | 765 | 839 | 486 | 869 | 691 | 453 | 616 | 589 | 241 | 571 | 279 | 185 |
-| 16 | 1158 | 1266 | 827 | 1208 | 1051 | 737 | 923 | 840 | 350 | 825 | 444 | 271 |
-| **32** | **1628** | **1831** | 1238 | **1575** | **1452** | 1044 | **1163** | **1025** | 523 | **1013** | 636 | **300** |
-| **64** | - | - | **1470** | - | - | **1239** | - | - | **724** | - | **719** | - |
+| Concurrency | Nemotron | QwQ-32B | Mag-2506 | Mag-2509 | Qwen3-30B | Devstral-S | Nanbeige-3B | Seed-OSS | Qwen3-Coder | GLM-4.5 | Qwen3-32B | EXAONE | Devstral-2 |
+|:-----------:|:--------:|:------:|:--------:|:--------:|:---------:|:----------:|:-----------:|:--------:|:-----------:|:-------:|:---------:|:------:|:----------:|
+| 1 | 262 | 102 | 156 | 144 | 178 | 180 | 249 | 78 | 184 | 119 | 78 | 110 | 41 |
+| 2 | 253 | 108 | 275 | 387 | 347 | 186 | 251 | 168 | 333 | 122 | 170 | 142 | 82 |
+| 4 | 280 | 136 | 524 | 281 | 621 | 425 | 279 | 373 | 462 | 150 | 331 | 161 | 124 |
+| 8 | 426 | 234 | 839 | 486 | 869 | 691 | 453 | 616 | 589 | 241 | 571 | 279 | 185 |
+| 16 | 637 | 416 | 1266 | 827 | 1208 | 1051 | 737 | 923 | 840 | 350 | 825 | 444 | 271 |
+| 32 | 479 | 611 | **1831** | 1238 | **1575** | **1452** | 1044 | **1163** | **1025** | 523 | **1013** | 636 | **300** |
+| **64** | **1307** | **733** | - | **1470** | - | - | **1239** | - | - | **724** | - | **719** | - |
 
 ### Failed / Incompatible Models
 
@@ -103,14 +106,14 @@ Comprehensive benchmarking suite for evaluating local LLM models on real-world c
 
 ## Key Findings
 
-### 1. Quality: Non-Reasoning Models Win on Structured Tasks
-The top 4 models by quality (100%) are all non-reasoning: Devstral-2-123B, Nemotron-3-Nano-30B, Qwen3-Coder-30B-A3B, and GLM-4.7-Flash. Reasoning models (DeepSeek-R1 distillations) score worst due to over-reasoning and poor structured output.
+### 1. Hidden Reasoning: Nemotron Was Thinking All Along
+Nemotron-3-Nano-30B has `enable_thinking=True` as the DEFAULT in its chat template. It uses `<think>`/`</think>` tags (DeepSeek R1 format) and was reasoning during all benchmarks. This makes it the **only 100% quality reasoning model** - and the fastest. The top 4 models by quality (100%) include 3 non-reasoning (Devstral-2, Qwen3-Coder, GLM-4.7-Flash) and 1 hidden reasoner (Nemotron).
 
 ### 2. The Hardest Test: Stratum Byte Order
 Only 4 models found the byte order/endianness bug in the Stratum protocol test. This is the strongest differentiator between 95.5% and 100% quality models.
 
-### 3. Nemotron-3-Nano-30B: Best Overall
-Mamba+MoE hybrid architecture achieves 100% quality AND fastest single-request speed (205 t/s). At 59GB BF16, it uses ~7.4GB/GPU at TP=8. No reasoning mode but the raw quality and speed are unmatched.
+### 3. Nemotron-3-Nano-30B: Best Overall (Hidden Reasoning Champion)
+Mamba+MoE hybrid architecture achieves 100% quality AND fastest single-request speed (262 t/s). At 59GB BF16, it uses ~7.4GB/GPU at TP=8. Has hidden `<think>` reasoning enabled by default in chat template - was thinking during ALL benchmarks. QwQ-32B AWQ (95.5%, 102 t/s) is a solid reasoning alternative.
 
 ### 4. Magistral-2506 AWQ: Throughput King
 At only 14GB (24B params), it achieves 1831 t/s peak - highest of any model. With only ~1.75GB/GPU for weights, it has massive KV cache headroom.
@@ -142,6 +145,7 @@ At only 3B parameters (~6GB BF16), Nanbeige4.1-3B scores 77.3% - matching EXAONE
 |-------|---------|----------|--------|------|-------|
 | Devstral-2-123B | 96 | 8 | 8 | Dense | 123B, tight VRAM |
 | Magistral-Small | 32 | 8 | 8 | Dense | 24B, both 2506/2509 |
+| QwQ-32B | 40 | 8 | 8 | Dense | Qwen2-based reasoning |
 | Qwen3-32B | 64 | 8 | 8 | Dense | Reasoning |
 | Seed-OSS-36B | 80 | 8 | 8 | Dense | Reasoning |
 | Nemotron-3-Nano-30B | 32 | 8 | 8 | Mamba+MoE | --trust-remote-code |

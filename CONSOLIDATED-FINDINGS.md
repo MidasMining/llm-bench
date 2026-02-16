@@ -11,7 +11,7 @@
 | Model | Quant | TP | Reasoning | Quality | Single t/s | Peak t/s | Context |
 |-------|-------|-----|-----------|---------|-----------|----------|---------|
 | **Devstral-2-123B** | AWQ | 8 | No | **100%** (22/22) | 41 | 300 @ C=32 | 32K† |
-| **Nemotron-3-Nano-30B** | BF16 | 8 | No | **100%** (22/22) | **205** | 1628 @ C=32 | 16K |
+| **Nemotron-3-Nano-30B** | BF16 | 8 | Yes†† | **100%** (22/22) | **262** | 1307 @ C=64 | 16K |
 | **Qwen3-Coder-30B-A3B** | AWQ | 4 | No | **100%** (22/22) | 184 | 1025 @ C=32 | 32K |
 | **GLM-4.7-Flash** | AWQ | 4 | No | **100%** (22/22) | 101 | 566 @ C=8 | 65K |
 | **GLM-4.5-Air** | AWQ FP16Mix | 8 | Yes∥ | **95.5%** (21/22) | 87 | 724 @ C=64 | 8K‖ |
@@ -23,6 +23,7 @@
 | **Nanbeige4.1-3B** | BF16 | 4 | Yes¶ | 77.3% (17/22) | 187 | 1239 @ C=64 | 131K |
 | Qwen3-30B-A3B | AWQ | 4 | No | 95.5% (21/22) | 178 | 1575 @ C=32 | 32K |
 | Devstral-Small-2-24B | AWQ | 8 | No | 95.5% (21/22) | 148 | 1452 @ C=32 | 32K |
+| **QwQ-32B** | AWQ | 8 | Yes | **95.5%** (21/22) | 102 | 733 @ C=64 | 16K |
 | **Seed-OSS-36B** | AWQ | 8 | Yes | 90.9% (20/22) | 88 | 1163 @ C=32 | 32K |
 | Qwen3-30B-A3B-Thinking | AWQ | 4 | Yes | 81.8% (18/22) | 160 | 1031 @ C=32 | 32K |
 | DS-R1-Distill-Qwen-32B | AWQ | 8 | Yes | 54.5% (12/22) | 78 | 992 @ C=32 | 32K |
@@ -37,18 +38,19 @@
 ¶ Nanbeige4.1-3B uses `<think>` tags (Qwen3-style reasoning), only 3B params, LlamaForCausalLM architecture
 ∥ GLM-4.5-Air uses `<think>` reasoning tags, 106B total / 12B active (MoE 128E/8A), QuantTrio AWQ FP16Mix with padded intermediate_size=11264
 ‖ GLM-4.5-Air context limited to 8K due to 69GB model at TP=8 leaving minimal KV cache headroom
+†† Nemotron-3-Nano-30B has hidden reasoning: `enable_thinking=True` by default in chat_template.jinja, uses `<think>`/`</think>` tags. Was thinking during ALL benchmarks.
 
 ### Category Winners
 
 | Category | Model | Why |
 |----------|-------|-----|
 | **Best Quality** | Devstral-2-123B | 100% quality (22/22 including 5/5 Stratum!), only 100% on byte order |
-| **Best Overall** | Nemotron-3-Nano-30B | 100% quality, 205 t/s single, 1628 t/s peak |
+| **Best Overall** | Nemotron-3-Nano-30B | 100% quality with hidden reasoning, 262 t/s single, 1307 t/s peak |
 | **Best Code Model** | Qwen3-Coder-30B-A3B | 100% quality, purpose-built for code |
 | **Best Peak Throughput** | Magistral-Small-2506 | 1831 t/s peak, 95.5% quality, only 14GB |
 | **Best Long Context** | GLM-4.7-Flash | 65K context, 100% quality |
-| **Best Reasoning** | Seed-OSS-36B | 90.9% quality with `<seed:think>` reasoning, 60 t/s with thinking |
-| **Best Reasoning (Quality)** | Qwen3-32B | 95.5% quality with `<think>` mode, but 78 t/s with thinking |
+| **Best Reasoning** | Nemotron-3-Nano-30B | **100% quality** with hidden `<think>` reasoning, 262 t/s - best reasoning model by far |
+| **Best Reasoning (Runner-up)** | QwQ-32B | 95.5% quality with `<think>` mode, 102 t/s, Qwen2-based |
 
 ### Failed / Marginal Models
 
@@ -87,16 +89,22 @@
   - Context limited to 32K (AWQ format, vs 131K BF16) but massive throughput gain
 - 95.5% quality on both, TP=8 compatible (32 heads)
 
-### 4. Nemotron-3-Nano-30B Remains Overall Champion
-- **100% quality + fastest single-request (205 t/s)** remains unbeaten
-- Mamba+MoE hybrid architecture is uniquely efficient
+### 4. Nemotron-3-Nano-30B: Hidden Reasoning Champion
+- **100% quality + fastest reasoning model (262 t/s single, 1307 t/s peak @ C=64)**
+- **Discovery**: `enable_thinking=True` is the DEFAULT in `chat_template.jinja` (line 12)
+  - Model uses `<think>`/`</think>` tags (same as DeepSeek R1 format)
+  - Was reasoning during ALL previous benchmarks without us knowing
+  - Has custom `nano_v3_reasoning_parser.py` for vLLM integration
+  - Our `strip_thinking_tags()` correctly stripped thinking from quality scoring
+- Mamba+MoE hybrid architecture is uniquely efficient even with reasoning overhead
 - BF16 at 59GB limits context to 16K at TP=8 with max-num-seqs 48
-- No reasoning mode available
+- **Implication**: The "best non-reasoning model" was actually reasoning all along
 
-### 5. Non-Reasoning Models Consistently Score Higher
-- Top 3 by quality are all non-reasoning: Nemotron (100%), Qwen3-Coder (100%), GLM-4.7-Flash (100%)
-- Reasoning mode introduces parsing overhead that can hurt structured test scores
-- For coding tasks, a fast non-reasoning model + human reasoning may outperform model reasoning
+### 5. Reasoning Models: Quality Varies Dramatically
+- **Best**: Nemotron (100% with hidden thinking), QwQ-32B (95.5%), Qwen3-32B (95.5%), GLM-4.5-Air (95.5%)
+- **Worst**: DS-R1-Distill models over-reason and fail structured tasks (45-55%)
+- Reasoning helps quality ONLY for models with good base capabilities
+- For coding tasks, Nemotron's hidden reasoning proves thinking + fast = best of both worlds
 
 ### 6. Devstral-2-123B: Quality King, Now with fp8 KV Cache
 - Only model to score **5/5 on Stratum Protocol** (byte order/endianness test)
@@ -228,6 +236,7 @@ vllm serve abhishekchohan/Magistral-Small-2506-AWQ \
 | Qwen3-32B | 64 | 8 | 8 | 8 | Dense | Reasoning mode |
 | DS-R1-Distill-Qwen-32B | 40 | 8 | 8 | 8 | Dense | R1 reasoning |
 | DS-R1-Distill-Llama-70B | 64 | 8 | 8 | 8 | Dense | R1 reasoning, Llama3 base |
+| QwQ-32B | 40 | 8 | 8 | 8 | Dense | Qwen2 base, `<think>` reasoning |
 | Seed-OSS-36B | 80 | 8 | 8 | 8 | Dense | Reasoning mode |
 | Nemotron-3-Nano-30B | 32 | 8 | 8 | 8 | Mamba+MoE | --trust-remote-code |
 | Devstral-Small-2-24B | 32 | 8 | 8 | 8 | Dense | Mistral3 arch |
@@ -245,25 +254,26 @@ vllm serve abhishekchohan/Magistral-Small-2506-AWQ \
 ## Parallel Throughput Scaling (All Models)
 
 ### Non-Reasoning Models
-| C | Seed-OSS | Qwen3-Coder | Qwen3-30B | Devstral-S | Nemotron | GLM-4.7 | Mag-2506 | Mag-2509 | Devstral-2 | EXAONE | Nanbeige-3B |
-|:-:|:--------:|:-----------:|:---------:|:----------:|:--------:|:-------:|:--------:|:--------:|:----------:|:------:|:-----------:|
-| 1 | 78 | 184 | 178 | 180 | 205 | 101 | 156 | 144 | 46 | 110 | 249 |
-| 2 | 168 | 333 | 347 | 186 | 327 | 188 | 275 | 387 | 76 | 142 | 251 |
-| 4 | 373 | 462 | 621 | 425 | 571 | 356 | 524 | 281 | 126 | 161 | 279 |
-| 8 | 616 | 589 | 869 | 691 | 765 | **566** | 839 | 486 | 188 | 279 | 453 |
-| 16 | 923 | 840 | 1208 | 1051 | 1158 | 255* | 1266 | 827 | **282** | 444 | 737 |
-| 32 | **1163** | **1025** | **1575** | **1452** | **1628** | 511 | **1831** | 1238 | - | 636 | 1044 |
-| 64 | - | - | - | - | - | - | - | **1470** | - | **719** | **1239** |
+| C | Seed-OSS | Qwen3-Coder | Qwen3-30B | Devstral-S | GLM-4.7 | Mag-2506 | Mag-2509 | Devstral-2 | EXAONE | Nanbeige-3B |
+|:-:|:--------:|:-----------:|:---------:|:----------:|:-------:|:--------:|:--------:|:----------:|:------:|:-----------:|
+| 1 | 78 | 184 | 178 | 180 | 101 | 156 | 144 | 46 | 110 | 249 |
+| 2 | 168 | 333 | 347 | 186 | 188 | 275 | 387 | 76 | 142 | 251 |
+| 4 | 373 | 462 | 621 | 425 | 356 | 524 | 281 | 126 | 161 | 279 |
+| 8 | 616 | 589 | 869 | 691 | **566** | 839 | 486 | 188 | 279 | 453 |
+| 16 | 923 | 840 | 1208 | 1051 | 255* | 1266 | 827 | **282** | 444 | 737 |
+| 32 | **1163** | **1025** | **1575** | **1452** | 511 | **1831** | 1238 | - | 636 | 1044 |
+| 64 | - | - | - | - | - | - | **1470** | - | **719** | **1239** |
 
 ### Reasoning Models
-| C | Qwen3-32B | Qwen3-30B-Think | GLM-4.5-Air | DS-R1-32B | DS-R1-70B |
-|:-:|:---------:|:---------------:|:-----------:|:---------:|:---------:|
-| 1 | 78 | 160 | 119 | 78 | 57 |
-| 2 | 170 | 300 | 122 | 172 | 115 |
-| 4 | 331 | 438 | 150 | 333 | 230 |
-| 8 | 571 | 648 | 241 | 564 | 335 |
-| 16 | 825 | 841 | 350 | 799 | 432 |
-| 32 | **1013** | **1031** | **992** | **540** |
+| C | Nemotron | QwQ-32B | Qwen3-32B | Qwen3-30B-Think | GLM-4.5-Air | DS-R1-32B | DS-R1-70B |
+|:-:|:--------:|:------:|:---------:|:---------------:|:-----------:|:---------:|:---------:|
+| 1 | 262 | 102 | 78 | 160 | 119 | 78 | 57 |
+| 2 | 253 | 108 | 170 | 300 | 122 | 172 | 115 |
+| 4 | 280 | 136 | 331 | 438 | 150 | 333 | 230 |
+| 8 | 426 | 234 | 571 | 648 | 241 | 564 | 335 |
+| 16 | 637 | 416 | 825 | 841 | 350 | 799 | 432 |
+| 32 | 479 | 611 | **1013** | **1031** | 523 | **992** | **540** |
+| 64 | **1307** | **733** | - | - | **724** | - | - |
 
 \* GLM-4.7-Flash throughput drops at C=16 due to CUDA graph cliff on SGLang TP=4
 
@@ -273,15 +283,17 @@ vllm serve abhishekchohan/Magistral-Small-2506-AWQ \
 
 | Model | Quality | Reasoning Style | Thinking Speed | Discussion Quality | Structured Tasks |
 |-------|---------|----------------|---------------|-------------------|-----------------|
-| **Seed-OSS-36B** | 90.9% | `<seed:think>` tags | ~60 t/s | Good - methodical analysis | Good |
+| **Nemotron-3-Nano-30B** | **100%** | `<think>` tags (hidden default) | ~262 t/s | Excellent | **Perfect** |
+| **QwQ-32B** | 95.5% | `<think>` tags | ~102 t/s | Good | Good |
 | **Qwen3-32B** | 95.5% | `<think>` tags | ~78 t/s total | Good | Good |
 | **GLM-4.5-Air** | 95.5% | `<think>` tags | ~87 t/s total | Good | Good (5/5 Stratum) |
+| **Seed-OSS-36B** | 90.9% | `<seed:think>` tags | ~60 t/s | Good - methodical analysis | Good |
 | Qwen3-30B-A3B-Think | 81.8% | `<think>` tags | ~160 t/s total | Decent | Weak on some |
-| DS-R1-Distill-Qwen-32B | 54.5% | `<think>` tags | ~78 t/s total | Verbose | Poor |
 | **Nanbeige4.1-3B** | 77.3% | `<think>` tags | ~187 t/s total | Decent - concise | Decent |
+| DS-R1-Distill-Qwen-32B | 54.5% | `<think>` tags | ~78 t/s total | Verbose | Poor |
 | DS-R1-Distill-Llama-70B | 45.5% | `<think>` tags | ~57 t/s total | Verbose | Very poor |
 
-**Recommendation**: For reasoning/discussion, use Seed-OSS-36B (best think quality at practical speed) or Qwen3-32B (higher structured quality but slower).
+**Recommendation**: For reasoning, use Nemotron-3-Nano-30B (100% quality, fastest thinking model, hidden reasoning). QwQ-32B is a solid alternative at 95.5% quality.
 
 ---
 
@@ -337,6 +349,10 @@ All raw benchmark JSON files are in `/home/llm/llm-bench/results-8xA4000/`:
 - `parallel_benchmark_20260215_183127.json` - Magistral-Small-2509 AWQ throughput
 - `comparison_20260215_192057.json` - GLM-4.5-Air AWQ FP16Mix (TP=8, expert parallel)
 - `parallel_benchmark_20260215_192351.json` - GLM-4.5-Air throughput
+- `comparison_20260215_205838.json` - Nemotron-3-Nano-30B BF16 (reasoning confirmed, 16K ctx)
+- `parallel_benchmark_20260215_210033.json` - Nemotron-3-Nano-30B throughput
+- `comparison_20260215_211042.json` - QwQ-32B AWQ (TP=8, reasoning)
+- `parallel_benchmark_20260215_211342.json` - QwQ-32B AWQ throughput
 
 ---
 
