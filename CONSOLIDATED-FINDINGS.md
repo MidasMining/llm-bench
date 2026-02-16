@@ -14,7 +14,8 @@
 | **Nemotron-3-Nano-30B** | BF16 | 8 | No | **100%** (22/22) | **205** | 1628 @ C=32 | 16K |
 | **Qwen3-Coder-30B-A3B** | AWQ | 4 | No | **100%** (22/22) | 184 | 1025 @ C=32 | 32K |
 | **GLM-4.7-Flash** | AWQ | 4 | No | **100%** (22/22) | 101 | 566 @ C=8 | 65K |
-| **Magistral-Small-2509** | BF16 | 8 | Yes§ | **95.5%** (21/22) | 88 | 1071 @ C=32 | 131K |
+| **Magistral-Small-2509** | AWQ | 8 | Yes§ | **95.5%** (21/22) | 144 | 1470 @ C=64 | 32K |
+| Magistral-Small-2509 | BF16 | 8 | Yes§ | 95.5% (21/22) | 88 | 1071 @ C=32 | 131K |
 | **Magistral-Small-2506** | AWQ | 8 | No* | **95.5%** (21/22) | 156 | **1831** @ C=32 | 32K |
 | **Qwen3-32B** | AWQ | 8 | Yes | 95.5% (21/22) | 78 | 1013 @ C=32 | 32K |
 | **EXAONE-4.0-32B** | GPTQ g32 | 8 | No‡ | 95.5% (21/22) | 110 | 719 @ C=64 | 131K |
@@ -74,12 +75,15 @@
 - Good for open-ended discussion but bad for structured debugging tasks
 - **Not recommended for coding workflows**
 
-### 3. Magistral-Small-2506 is a Hidden Gem
-- Only 14GB AWQ (24B params) but achieves **1831 t/s peak** (highest of any model!)
-- 95.5% quality matches much larger models
-- At TP=8 with only ~1.75GB/GPU for weights, has massive KV cache headroom
-- Could potentially serve 128K+ context at low concurrency
-- Reasoning capability exists but broken in community AWQ quant
+### 3. Magistral Family: AWQ Quantization Unlocks Performance
+- **2506 AWQ**: Only 14GB (24B params) but achieves **1831 t/s peak** (highest of any model!)
+- **2509 AWQ**: Custom-quantized from multimodal `Mistral3ForConditionalGeneration` text extraction
+  - Extracted `MistralForCausalLM` text model (363 params incl. lm_head) from multimodal wrapper
+  - AWQ quantization with `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` (fragmentation fix)
+  - **144 t/s single (+64% vs BF16), 1470 t/s peak (+37%)** - quality preserved at 95.5%
+  - 14GB AWQ vs 48GB BF16 (71% compression), keeps [THINK]/[/THINK] reasoning tokens
+  - Context limited to 32K (AWQ format, vs 131K BF16) but massive throughput gain
+- 95.5% quality on both, TP=8 compatible (32 heads)
 
 ### 4. Nemotron-3-Nano-30B Remains Overall Champion
 - **100% quality + fastest single-request (205 t/s)** remains unbeaten
@@ -203,6 +207,7 @@ vllm serve abhishekchohan/Magistral-Small-2506-AWQ \
 |-------|---------|----------|--------|---------|------|-------|
 | Devstral-2-123B | 96 | 8 | 8 | 8 | Dense | 123B params, Ministral3 arch, tight VRAM |
 | Magistral-Small-2506 | 32 | 8 | 8 | 8 | Dense | 24B params, Mistral arch |
+| Magistral-Small-2509 | 32 | 8 | 8 | 8 | Dense | 24B params, Mistral3→Mistral text extraction, AWQ custom |
 | Qwen3-32B | 64 | 8 | 8 | 8 | Dense | Reasoning mode |
 | DS-R1-Distill-Qwen-32B | 40 | 8 | 8 | 8 | Dense | R1 reasoning |
 | DS-R1-Distill-Llama-70B | 64 | 8 | 8 | 8 | Dense | R1 reasoning, Llama3 base |
@@ -222,15 +227,15 @@ vllm serve abhishekchohan/Magistral-Small-2506-AWQ \
 ## Parallel Throughput Scaling (All Models)
 
 ### Non-Reasoning Models
-| C | Seed-OSS | Qwen3-Coder | Qwen3-30B | Devstral-S | Nemotron | GLM-4.7 | Magistral | Devstral-2 | EXAONE | Nanbeige-3B |
-|:-:|:--------:|:-----------:|:---------:|:----------:|:--------:|:-------:|:---------:|:----------:|:------:|:-----------:|
-| 1 | 78 | 184 | 178 | 180 | 205 | 101 | 156 | 46 | 110 | 249 |
-| 2 | 168 | 333 | 347 | 186 | 327 | 188 | 275 | 76 | 142 | 251 |
-| 4 | 373 | 462 | 621 | 425 | 571 | 356 | 524 | 126 | 161 | 279 |
-| 8 | 616 | 589 | 869 | 691 | 765 | **566** | 839 | 188 | 279 | 453 |
-| 16 | 923 | 840 | 1208 | 1051 | 1158 | 255* | 1266 | **282** | 444 | 737 |
-| 32 | **1163** | **1025** | **1575** | **1452** | **1628** | 511 | **1831** | - | 636 | 1044 |
-| 64 | - | - | - | - | - | - | - | - | **719** | **1239** |
+| C | Seed-OSS | Qwen3-Coder | Qwen3-30B | Devstral-S | Nemotron | GLM-4.7 | Mag-2506 | Mag-2509 | Devstral-2 | EXAONE | Nanbeige-3B |
+|:-:|:--------:|:-----------:|:---------:|:----------:|:--------:|:-------:|:--------:|:--------:|:----------:|:------:|:-----------:|
+| 1 | 78 | 184 | 178 | 180 | 205 | 101 | 156 | 144 | 46 | 110 | 249 |
+| 2 | 168 | 333 | 347 | 186 | 327 | 188 | 275 | 387 | 76 | 142 | 251 |
+| 4 | 373 | 462 | 621 | 425 | 571 | 356 | 524 | 281 | 126 | 161 | 279 |
+| 8 | 616 | 589 | 869 | 691 | 765 | **566** | 839 | 486 | 188 | 279 | 453 |
+| 16 | 923 | 840 | 1208 | 1051 | 1158 | 255* | 1266 | 827 | **282** | 444 | 737 |
+| 32 | **1163** | **1025** | **1575** | **1452** | **1628** | 511 | **1831** | 1238 | - | 636 | 1044 |
+| 64 | - | - | - | - | - | - | - | **1470** | - | **719** | **1239** |
 
 ### Reasoning Models
 | C | Qwen3-32B | Qwen3-30B-Think | DS-R1-32B | DS-R1-70B |
@@ -306,9 +311,11 @@ All raw benchmark JSON files are in `/home/llm/llm-bench/results-8xA4000/`:
 - `comparison_20260215_004318.json` - Devstral-2-123B AWQ (fp8 KV cache, 32K context)
 - `comparison_20260215_015429.json` - Magistral-Small-2509 BF16 (mistral format, 131K context)
 
-### Round 6 (Feb 15) - Small reasoning model + custom quant
+### Round 6 (Feb 15) - Small reasoning model + custom quants
 - `comparison_20260215_034513.json` - Nanbeige4.1-3B BF16 (TP=4, 131K ctx, reasoning)
 - `comparison_20260215_132250.json` - EXAONE-4.0-32B custom GPTQ g32 (TP=8, Marlin+Exllama)
+- `comparison_20260215_182901.json` - Magistral-Small-2509 custom AWQ (TP=8, text extraction from multimodal)
+- `parallel_benchmark_20260215_183127.json` - Magistral-Small-2509 AWQ throughput
 
 ---
 

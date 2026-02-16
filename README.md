@@ -30,7 +30,7 @@ Comprehensive benchmarking suite for evaluating local LLM models on real-world c
 | 2 | **Nemotron-3-Nano-30B** | BF16 | 8 | **100%** (22/22) | **205** | **1628** @ C=32 | 16K | vLLM |
 | 3 | **Qwen3-Coder-30B-A3B** | AWQ | 4 | **100%** (22/22) | 184 | 1025 @ C=32 | 32K | vLLM |
 | 4 | **GLM-4.7-Flash** | AWQ | 4 | **100%** (22/22) | 101 | 566 @ C=8 | 65K | SGLang |
-| 5 | **Magistral-Small-2509** | BF16 | 8 | 95.5% (21/22) | 88 | 1071 @ C=32 | 131K | vLLM |
+| 5 | **Magistral-Small-2509** | AWQ | 8 | 95.5% (21/22) | 144 | 1470 @ C=64 | 32K | vLLM |
 | 6 | **Magistral-Small-2506** | AWQ | 8 | 95.5% (21/22) | 156 | **1831** @ C=32 | 32K | vLLM |
 | 7 | Qwen3-32B | AWQ | 8 | 95.5% (21/22) | 78 | 1013 @ C=32 | 32K | vLLM |
 | 8 | EXAONE-4.0-32B | GPTQ g32 | 8 | 95.5% (21/22) | 110 | 719 @ C=64 | 131K | vLLM |
@@ -77,15 +77,15 @@ Comprehensive benchmarking suite for evaluating local LLM models on real-world c
 
 ### Throughput Scaling (tokens/second)
 
-| Concurrency | Nemotron | Magistral-2506 | Qwen3-30B | Devstral-S | Nanbeige-3B | Seed-OSS | Qwen3-Coder | Magistral-2509 | Qwen3-32B | EXAONE | Devstral-2 |
-|:-----------:|:--------:|:--------------:|:---------:|:----------:|:-----------:|:--------:|:-----------:|:--------------:|:---------:|:------:|:----------:|
-| 1 | 205 | 156 | 178 | 180 | 249 | 78 | 184 | 88 | 78 | 110 | 41 |
-| 2 | 327 | 275 | 347 | 186 | 251 | 168 | 333 | 135 | 170 | 142 | 82 |
-| 4 | 571 | 524 | 621 | 425 | 279 | 373 | 462 | 229 | 331 | 161 | 124 |
-| 8 | 765 | 839 | 869 | 691 | 453 | 616 | 589 | 399 | 571 | 279 | 185 |
-| 16 | 1158 | 1266 | 1208 | 1051 | 737 | 923 | 840 | 649 | 825 | 444 | 271 |
-| **32** | **1628** | **1831** | **1575** | **1452** | 1044 | **1163** | **1025** | **1071** | **1013** | 636 | **300** |
-| **64** | - | - | - | - | **1239** | - | - | - | - | **719** | - |
+| Concurrency | Nemotron | Mag-2506 | Mag-2509 | Qwen3-30B | Devstral-S | Nanbeige-3B | Seed-OSS | Qwen3-Coder | Qwen3-32B | EXAONE | Devstral-2 |
+|:-----------:|:--------:|:--------:|:--------:|:---------:|:----------:|:-----------:|:--------:|:-----------:|:---------:|:------:|:----------:|
+| 1 | 205 | 156 | 144 | 178 | 180 | 249 | 78 | 184 | 78 | 110 | 41 |
+| 2 | 327 | 275 | 387 | 347 | 186 | 251 | 168 | 333 | 170 | 142 | 82 |
+| 4 | 571 | 524 | 281 | 621 | 425 | 279 | 373 | 462 | 331 | 161 | 124 |
+| 8 | 765 | 839 | 486 | 869 | 691 | 453 | 616 | 589 | 571 | 279 | 185 |
+| 16 | 1158 | 1266 | 827 | 1208 | 1051 | 737 | 923 | 840 | 825 | 444 | 271 |
+| **32** | **1628** | **1831** | 1238 | **1575** | **1452** | 1044 | **1163** | **1025** | **1013** | 636 | **300** |
+| **64** | - | - | **1470** | - | - | **1239** | - | - | - | **719** | - |
 
 ### Failed / Incompatible Models
 
@@ -128,8 +128,9 @@ EXAONE TP=2+PP=4 (8 GPUs): quality dropped 18pp, throughput dropped 26%. Only ga
 ### 8. Nanbeige4.1-3B: 3B Reasoning Model Punches Above Its Weight
 At only 3B parameters (~6GB BF16), Nanbeige4.1-3B scores 77.3% - matching EXAONE-4.0-32B (10x larger). Uses `<think>` reasoning tags, 131K context, and achieves 187 t/s single-request. Fits on a single 16GB GPU. Best quality-per-parameter ratio in the benchmark.
 
-### 9. Custom Quantization Can Unlock TP
-EXAONE-4.0-32B was stuck at TP=2 with AWQ/GPTQ g128 (Marlin requires `size_k % 128 == 0`, but 27392/8=3424, 3424%128≠0). Custom GPTQ with `group_size=32, desc_act=False` + `--dtype float16` enables Marlin for aligned layers and Exllama fallback for misaligned ones. Result: TP=8, 110 t/s single (+67%), quality preserved at 95.5%.
+### 9. Custom Quantization Unlocks Performance
+- **EXAONE-4.0-32B**: Stuck at TP=2 with AWQ/GPTQ g128 (Marlin alignment). Custom GPTQ g32 + `--dtype float16` enables TP=8: 110 t/s (+67%), quality preserved.
+- **Magistral-Small-2509**: Multimodal model (`Mistral3ForConditionalGeneration`) had no community AWQ. Extracted text model from multimodal wrapper, AWQ quantized with fragmentation fix. Result: 144 t/s (+64% vs BF16), 1470 t/s peak (+37%), quality preserved at 95.5%.
 
 ---
 
