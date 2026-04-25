@@ -246,7 +246,7 @@ tests:
     enabled: true
     script: "long_context_test.py"
 
-output_dir: "./results-8xA4000"
+output_dir: "./results/8xA4000"
 timeout: 600
 temperature: 0.0
 

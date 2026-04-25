@@ -203,30 +203,17 @@ vllm serve cyankiwi/Devstral-2-123B-Instruct-2512-AWQ-4bit \
 
 ---
 
-## vLLM Patches Required
+## vLLM Patches
 
-Two bugs in vLLM 0.14 must be patched for fp8 KV cache to work:
+Two bugs in vLLM 0.14 had to be patched for fp8 KV cache to work across all
+quant formats. Status as of vLLM 0.20.0:
 
-### Patch 1: FlashInfer positional arg bug
-**File**: `vllm/v1/attention/backends/flashinfer.py` line 1590
-**Issue**: flashinfer 0.6.1 added `o_data_type` parameter to `plan()`, shifting all positional args
-**Fix**: Change positional arguments to keyword arguments in `fast_plan_decode`
+| Patch | Upstream status | Location |
+|---|---|---|
+| FlashInfer positional arg fix | **Fixed in 0.18.0+** (still fixed at 0.20.0) | `archive/patches/` |
+| Compressed-tensors false fp8 KV rejection | **Still broken at 0.20.0** | `projects/turboquant/patches/` |
 
-### Patch 2: Compressed-tensors false fp8 KV rejection
-**File**: `vllm/model_executor/layers/quantization/compressed_tensors/compressed_tensors.py` line 179
-**Issue**: `get_quant_method()` unconditionally returns `CompressedTensorsKVCacheMethod` for all Attention layers, even when `kv_cache_scheme` is null
-**Fix**:
-```python
-# Before (broken):
-if isinstance(layer, Attention):
-    return CompressedTensorsKVCacheMethod(self)
-
-# After (fixed):
-if isinstance(layer, Attention):
-    if self.kv_cache_scheme is not None:
-        return CompressedTensorsKVCacheMethod(self)
-    return None
-```
+See the README in each patches dir for the diff and apply instructions.
 
 ---
 
@@ -245,22 +232,46 @@ python compare_models.py --model <model-id> --api-url http://localhost:8000/v1 -
 # With server config metadata
 python compare_models.py --model <model-id> --api-url http://localhost:8000/v1 \
   --parallel --tp 8 --framework vllm --quant-method awq \
-  --output ./results-8xA4000
+  --output ./results/8xA4000
 ```
+
+For the multi-step SSH tool-call reliability bench, see `tool_call_benchmark/README.md`.
 
 ## File Structure
 
 ```
 llm-bench/
-├── compare_models.py              # Main benchmark harness (v2.1)
-├── parallel_benchmark.py          # Standalone throughput benchmark
-├── models.yaml                    # Model configurations
-├── CONSOLIDATED-FINDINGS.md       # Detailed analysis and findings
-├── results-8xA4000/               # 8x RTX A4000 benchmark results (22 JSON files)
-├── results-gen4/                   # PCIe Gen4 test results
-├── results/                        # Legacy single-GPU results
-└── practical/                      # Individual test scripts
+├── compare_models.py              # main benchmark harness (v2.1)
+├── parallel_benchmark.py          # standalone throughput benchmark
+├── long_context_test.py           # long-context test
+├── models.yaml                    # model configurations
+├── CONSOLIDATED-FINDINGS.md       # detailed analysis and findings (8x A4000 sweep)
+├── MODEL-RESULTS-2026.md          # cross-model results summary
+├── practical/                     # individual test scripts (mining pool scenarios)
+├── tool_call_benchmark/           # multi-step SSH tool-call reliability bench
+├── docs/                          # quickstarts, install guide, planned bench notes
+├── results/                       # generic bench output
+│   ├── 8xA4000/                   # 8x RTX A4000 sweep
+│   ├── compare/                   # quality comparison runs
+│   ├── gen4/                      # PCIe Gen4 test results
+│   ├── parallel/                  # throughput-only runs
+│   └── tp8/                       # TP=8 scaling runs
+├── archive/
+│   └── patches/                   # vLLM patches now obsolete upstream
+└── projects/
+    └── turboquant/                # TurboQuant KV-compression project
+        ├── nemo-tq-benchmark.md
+        ├── patches/               # vLLM patches still needed for TQ workflow
+        ├── results/               # V100/A4000 TQ-specific runs
+        └── tool-call-results/     # tool-call bench: TQ vs BF16/fp8 comparisons
 ```
+
+The repo holds two kinds of content:
+
+- **The bench utility** — runners, configs, generic test suites (root, `tool_call_benchmark/`, `practical/`, `results/`)
+- **Projects that consume the utility** — under `projects/<name>/`. Currently just `turboquant/`. New projects (other quant methods, model evals) should follow the same pattern.
+
+`archive/` holds material no longer in active use but kept for reproducibility.
 
 ## Historical Results
 

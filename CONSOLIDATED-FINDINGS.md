@@ -311,7 +311,7 @@ vllm serve abhishekchohan/Magistral-Small-2506-AWQ \
 ---
 
 ## Result Files
-All raw benchmark JSON files are in `/home/llm/llm-bench/results-8xA4000/`:
+All raw benchmark JSON files are in `results/8xA4000/`:
 
 ### Round 1 (Feb 12-13) - Base models
 - `comparison_20260212_194040.json` - Seed-OSS-36B AWQ
