@@ -1,0 +1,34 @@
+[
+  {
+    "name": "/home/llm/models/Nemotron-3-Super-120B-AWQ-4bit",
+    "api_url": "http://localhost:8001/v1",
+    "timestamp": "2026-04-20T02:07:16.895717",
+    "gpu_info": {
+      "name": "NVIDIA RTX A4000",
+      "memory_mb": 16376,
+      "driver": "570.211.01\nNVIDIA RTX A4000",
+      "detected": true
+    },
+    "server_config": {},
+    "sequential": {
+      "tests": [
+        {
+          "name": "Payment System Bugs",
+          "passed": true,
+          "score": 4,
+          "max_score": 4,
+          "details": {
+            "race condition": "PASS",
+            "sql injection": "PASS",
+            "float precision": "PASS",
+            "atomicity": "PASS"
+          },
+          "tokens_used": 3121,
+          "time_seconds": 31.103633165359497
+        }
+      ],
+      "throughput": 100.34197559518212
+    },
+    "parallel": null
+  }
+]

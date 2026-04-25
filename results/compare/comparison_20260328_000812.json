@@ -1,0 +1,101 @@
+[
+  {
+    "name": "/home/llm/models/Nemotron-3-Super-120B-AWQ-4bit",
+    "api_url": "http://localhost:8001/v1",
+    "timestamp": "2026-03-28T00:05:39.861428",
+    "gpu_info": {
+      "name": "NVIDIA RTX A4000",
+      "memory_mb": 16376,
+      "driver": "570.211.01\nNVIDIA RTX A4000",
+      "detected": true
+    },
+    "server_config": {
+      "tensor_parallel_size": 8,
+      "gpu_memory_utilization": 0.9,
+      "max_model_len": 4096,
+      "max_num_seqs": 4,
+      "quant_method": "compressed-tensors INT4",
+      "notes": "cyankiwi AWQ 4-bit, TP=8 EP=8, mamba-ssm-cache-dtype float16",
+      "framework": "vllm",
+      "framework_version": "0.18.0"
+    },
+    "sequential": {
+      "tests": [
+        {
+          "name": "ZMQ Listener Bug",
+          "passed": false,
+          "score": 0,
+          "max_score": 2,
+          "details": {
+            "socket creation in main thread": "FAIL",
+            "zmq context not thread safe this way": "FAIL"
+          },
+          "tokens_used": 0,
+          "time_seconds": 30.380034923553467
+        },
+        {
+          "name": "PPLNS Mining Pool Bugs",
+          "passed": true,
+          "score": 3,
+          "max_score": 3,
+          "details": {
+            "hardcoded share_window ignores config": "PASS",
+            "window_size calculated but not used": "PASS",
+            "config key mismatch": "PASS"
+          },
+          "tokens_used": 3192,
+          "time_seconds": 30.389937162399292
+        },
+        {
+          "name": "Payment System Bugs",
+          "passed": false,
+          "score": 0,
+          "max_score": 4,
+          "details": {
+            "race condition": "FAIL",
+            "sql injection": "FAIL",
+            "float precision": "FAIL",
+            "atomicity": "FAIL"
+          },
+          "tokens_used": 0,
+          "time_seconds": 30.331921577453613
+        },
+        {
+          "name": "Stratum Protocol Bugs",
+          "passed": false,
+          "score": 0,
+          "max_score": 5,
+          "details": {
+            "byte order / endianness": "FAIL",
+            "logging before submit / info leak": "FAIL",
+            "race condition / stale": "FAIL",
+            "memory leak / pruning": "FAIL",
+            "input validation / hex": "FAIL"
+          },
+          "tokens_used": 0,
+          "time_seconds": 30.740757942199707
+        },
+        {
+          "name": "HiveOS Wrapper Creation",
+          "passed": false,
+          "score": 0,
+          "max_score": 8,
+          "details": {
+            "uses heredocs": "FAIL",
+            "h-manifest with CUSTOM_NAME": "FAIL",
+            "uses CUSTOM_* variables": "FAIL",
+            "creates h-config.sh": "FAIL",
+            "creates h-run.sh with exec": "FAIL",
+            "creates h-stats.sh with JSON": "FAIL",
+            "correct directory structure": "FAIL",
+            "api port configured": "FAIL"
+          },
+          "tokens_used": 0,
+          "time_seconds": 30.023972749710083
+        }
+      ],
+      "throughput": 21.018443081554295
+    },
+    "parallel": null
+  }
+]

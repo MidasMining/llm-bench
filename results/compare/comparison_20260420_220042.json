@@ -1,0 +1,32 @@
+[
+  {
+    "name": "/home/llm/models/MiniMax-M2.7-REAP-172B-AWQ",
+    "api_url": "http://localhost:8002/v1",
+    "timestamp": "2026-04-20T22:00:08.868275",
+    "gpu_info": {
+      "name": "NVIDIA RTX A4000",
+      "memory_mb": 16376,
+      "driver": "570.211.01\nNVIDIA RTX A4000",
+      "detected": true
+    },
+    "server_config": {},
+    "sequential": {
+      "tests": [
+        {
+          "name": "ZMQ Listener Bug",
+          "passed": true,
+          "score": 2,
+          "max_score": 2,
+          "details": {
+            "socket creation in main thread": "PASS",
+            "zmq context not thread safe this way": "PASS"
+          },
+          "tokens_used": 2619,
+          "time_seconds": 32.86428737640381
+        }
+      ],
+      "throughput": 79.69136741058358
+    },
+    "parallel": null
+  }
+]

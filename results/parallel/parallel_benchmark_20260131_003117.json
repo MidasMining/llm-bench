@@ -1,0 +1,89 @@
+{
+  "version": "1.0",
+  "model": "seed-oss",
+  "api_url": "http://localhost:8100/v1",
+  "timestamp": "20260131_003117",
+  "sequential": {
+    "throughput_toks": 29.758217464669833,
+    "avg_latency_s": 16.29045323530833,
+    "total_tokens": 2909,
+    "total_time_s": 97.75451111793518
+  },
+  "parallel": [
+    {
+      "concurrency": 1,
+      "throughput_toks": 43.71530030844705,
+      "per_request_toks": 43.71530030844705,
+      "avg_latency_s": 1.1894025802612305,
+      "p50_latency_s": 1.1894025802612305,
+      "p95_latency_s": 1.1894025802612305,
+      "successful": 1,
+      "failed": 0
+    },
+    {
+      "concurrency": 2,
+      "throughput_toks": 43.89891295155264,
+      "per_request_toks": 21.94945647577632,
+      "avg_latency_s": 3.2000867128372192,
+      "p50_latency_s": 3.2000867128372192,
+      "p95_latency_s": 5.1017491817474365,
+      "successful": 2,
+      "failed": 0
+    },
+    {
+      "concurrency": 4,
+      "throughput_toks": 58.43766972449198,
+      "per_request_toks": 14.609417431122996,
+      "avg_latency_s": 14.150118887424469,
+      "p50_latency_s": 12.6215500831604,
+      "p95_latency_s": 29.842487812042236,
+      "successful": 4,
+      "failed": 0
+    },
+    {
+      "concurrency": 8,
+      "throughput_toks": 105.496635007103,
+      "per_request_toks": 13.187079375887874,
+      "avg_latency_s": 12.719464659690857,
+      "p50_latency_s": 12.417023658752441,
+      "p95_latency_s": 29.69650650024414,
+      "successful": 8,
+      "failed": 0
+    },
+    {
+      "concurrency": 16,
+      "throughput_toks": 249.97645119520763,
+      "per_request_toks": 15.623528199700477,
+      "avg_latency_s": 15.821160659193993,
+      "p50_latency_s": 20.323704481124878,
+      "p95_latency_s": 30.249592781066895,
+      "successful": 16,
+      "failed": 0
+    },
+    {
+      "concurrency": 32,
+      "throughput_toks": 479.26394106110473,
+      "per_request_toks": 14.976998158159523,
+      "avg_latency_s": 16.042513102293015,
+      "p50_latency_s": 20.883848905563354,
+      "p95_latency_s": 30.813870429992676,
+      "successful": 32,
+      "failed": 0
+    },
+    {
+      "concurrency": 64,
+      "throughput_toks": 766.0429540044665,
+      "per_request_toks": 11.96942115631979,
+      "avg_latency_s": 23.73436765000224,
+      "p50_latency_s": 30.463627576828003,
+      "p95_latency_s": 40.246604442596436,
+      "successful": 64,
+      "failed": 0
+    }
+  ],
+  "peak": {
+    "concurrency": 64,
+    "throughput_toks": 766.0429540044665,
+    "speedup_vs_sequential": 25.74223254178258
+  }
+}

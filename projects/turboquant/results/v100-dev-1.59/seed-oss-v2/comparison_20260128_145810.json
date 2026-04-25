@@ -1,0 +1,81 @@
+[
+  {
+    "name": "seed-oss",
+    "api_url": "http://localhost:8100/v1",
+    "timestamp": "2026-01-28T14:21:43.411046",
+    "tests": [
+      {
+        "name": "ZMQ Listener Bug",
+        "passed": true,
+        "score": 2,
+        "max_score": 2,
+        "details": {
+          "socket creation in main thread": "PASS",
+          "zmq context not thread safe this way": "PASS"
+        },
+        "tokens_used": 2654,
+        "time_seconds": 435.9843919277191
+      },
+      {
+        "name": "PPLNS Mining Pool Bugs",
+        "passed": true,
+        "score": 3,
+        "max_score": 3,
+        "details": {
+          "hardcoded share_window ignores config": "PASS",
+          "window_size calculated but not used": "PASS",
+          "config key mismatch": "PASS"
+        },
+        "tokens_used": 3193,
+        "time_seconds": 436.3528296947479
+      },
+      {
+        "name": "Payment System Bugs",
+        "passed": true,
+        "score": 4,
+        "max_score": 4,
+        "details": {
+          "race condition": "PASS",
+          "sql injection": "PASS",
+          "float precision": "PASS",
+          "atomicity": "PASS"
+        },
+        "tokens_used": 3148,
+        "time_seconds": 437.625568151474
+      },
+      {
+        "name": "Stratum Protocol Bugs",
+        "passed": false,
+        "score": 4,
+        "max_score": 5,
+        "details": {
+          "byte order / endianness": "PASS",
+          "logging before submit / info leak": "PASS",
+          "race condition / stale": "PASS",
+          "memory leak / pruning": "FAIL",
+          "input validation / hex": "PASS"
+        },
+        "tokens_used": 3872,
+        "time_seconds": 442.85217905044556
+      },
+      {
+        "name": "HiveOS Wrapper Creation",
+        "passed": true,
+        "score": 8,
+        "max_score": 8,
+        "details": {
+          "uses heredocs": "PASS",
+          "h-manifest with CUSTOM_NAME": "PASS",
+          "uses CUSTOM_* variables": "PASS",
+          "creates h-config.sh": "PASS",
+          "creates h-run.sh with exec": "PASS",
+          "creates h-stats.sh with JSON": "PASS",
+          "correct directory structure": "PASS",
+          "api port configured": "PASS"
+        },
+        "tokens_used": 2435,
+        "time_seconds": 434.4644651412964
+      }
+    ]
+  }
+]

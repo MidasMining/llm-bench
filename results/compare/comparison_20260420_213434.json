@@ -1,0 +1,92 @@
+[
+  {
+    "name": "/home/llm/models/MiniMax-M2.7-REAP-172B-AWQ",
+    "api_url": "http://localhost:8002/v1",
+    "timestamp": "2026-04-20T21:34:12.549425",
+    "gpu_info": {
+      "name": "NVIDIA RTX A4000",
+      "memory_mb": 16376,
+      "driver": "570.211.01\nNVIDIA RTX A4000",
+      "detected": true
+    },
+    "server_config": {},
+    "sequential": {
+      "tests": [
+        {
+          "name": "ZMQ Listener Bug",
+          "passed": false,
+          "score": 0,
+          "max_score": 2,
+          "details": {
+            "socket creation in main thread": "FAIL",
+            "zmq context not thread safe this way": "FAIL"
+          },
+          "tokens_used": 0,
+          "time_seconds": 0.004010915756225586
+        },
+        {
+          "name": "PPLNS Mining Pool Bugs",
+          "passed": false,
+          "score": 0,
+          "max_score": 3,
+          "details": {
+            "hardcoded share_window ignores config": "FAIL",
+            "window_size calculated but not used": "FAIL",
+            "config key mismatch": "FAIL"
+          },
+          "tokens_used": 0,
+          "time_seconds": 0.002818584442138672
+        },
+        {
+          "name": "Payment System Bugs",
+          "passed": false,
+          "score": 0,
+          "max_score": 4,
+          "details": {
+            "race condition": "FAIL",
+            "sql injection": "FAIL",
+            "float precision": "FAIL",
+            "atomicity": "FAIL"
+          },
+          "tokens_used": 0,
+          "time_seconds": 0.002862691879272461
+        },
+        {
+          "name": "Stratum Protocol Bugs",
+          "passed": false,
+          "score": 0,
+          "max_score": 5,
+          "details": {
+            "byte order / endianness": "FAIL",
+            "logging before submit / info leak": "FAIL",
+            "race condition / stale": "FAIL",
+            "memory leak / pruning": "FAIL",
+            "input validation / hex": "FAIL"
+          },
+          "tokens_used": 0,
+          "time_seconds": 0.0023097991943359375
+        },
+        {
+          "name": "HiveOS Wrapper Creation",
+          "passed": false,
+          "score": 0,
+          "max_score": 8,
+          "details": {
+            "uses heredocs": "FAIL",
+            "h-manifest with CUSTOM_NAME": "FAIL",
+            "uses CUSTOM_* variables": "FAIL",
+            "creates h-config.sh": "FAIL",
+            "creates h-run.sh with exec": "FAIL",
+            "creates h-stats.sh with JSON": "FAIL",
+            "correct directory structure": "FAIL",
+            "api port configured": "FAIL"
+          },
+          "tokens_used": 0,
+          "time_seconds": 0.0018701553344726562
+        }
+      ],
+      "throughput": 0.0
+    },
+    "parallel": null
+  }
+]

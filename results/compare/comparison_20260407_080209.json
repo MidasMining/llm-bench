@@ -1,0 +1,77 @@
+[
+  {
+    "name": "/home/llm/models/MiniMax-M2.5-REAP-139B-AWQ",
+    "api_url": "http://localhost:8001/v1",
+    "timestamp": "2026-04-07T07:59:32.041007",
+    "gpu_info": {
+      "name": "NVIDIA RTX A4000",
+      "memory_mb": 16376,
+      "driver": "570.211.01\nNVIDIA RTX A4000",
+      "detected": true
+    },
+    "server_config": {
+      "framework": "vllm",
+      "framework_version": "0.14.0"
+    },
+    "sequential": {
+      "tests": [
+        {
+          "name": "ZMQ Listener Bug",
+          "passed": true,
+          "score": 2,
+          "max_score": 2,
+          "details": {
+            "socket creation in main thread": "PASS",
+            "zmq context not thread safe this way": "PASS"
+          },
+          "tokens_used": 2619,
+          "time_seconds": 37.35284948348999
+        },
+        {
+          "name": "PPLNS Mining Pool Bugs",
+          "passed": true,
+          "score": 3,
+          "max_score": 3,
+          "details": {
+            "hardcoded share_window ignores config": "PASS",
+            "window_size calculated but not used": "PASS",
+            "config key mismatch": "PASS"
+          },
+          "tokens_used": 3122,
+          "time_seconds": 39.03404903411865
+        },
+        {
+          "name": "Payment System Bugs",
+          "passed": false,
+          "score": 2,
+          "max_score": 4,
+          "details": {
+            "race condition": "PASS",
+            "sql injection": "FAIL",
+            "float precision": "FAIL",
+            "atomicity": "PASS"
+          },
+          "tokens_used": 3072,
+          "time_seconds": 39.106428146362305
+        },
+        {
+          "name": "Stratum Protocol Bugs",
+          "passed": false,
+          "score": 0,
+          "max_score": 5,
+          "details": {
+            "byte order / endianness": "FAIL",
+            "logging before submit / info leak": "FAIL",
+            "race condition / stale": "FAIL",
+            "memory leak / pruning": "FAIL",
+            "input validation / hex": "FAIL"
+          },
+          "tokens_used": 3711,
+          "time_seconds": 41.29903244972229
+        }
+      ],
+      "throughput": 79.87634136506996
+    },
+    "parallel": null
+  }
+]

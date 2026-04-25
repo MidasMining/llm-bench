@@ -1,0 +1,77 @@
+[
+  {
+    "name": "cascade2-vllm018",
+    "api_url": "http://localhost:8001/v1",
+    "timestamp": "2026-03-30T01:00:57.537677",
+    "gpu_info": {
+      "name": "NVIDIA RTX A4000",
+      "memory_mb": 16376,
+      "driver": "570.211.01\nNVIDIA RTX A4000",
+      "detected": true
+    },
+    "server_config": {
+      "framework": "vllm",
+      "framework_version": "0.14.0"
+    },
+    "sequential": {
+      "tests": [
+        {
+          "name": "ZMQ Listener Bug",
+          "passed": false,
+          "score": 0,
+          "max_score": 2,
+          "details": {
+            "socket creation in main thread": "FAIL",
+            "zmq context not thread safe this way": "FAIL"
+          },
+          "tokens_used": 0,
+          "time_seconds": 0.0023212432861328125
+        },
+        {
+          "name": "PPLNS Mining Pool Bugs",
+          "passed": false,
+          "score": 0,
+          "max_score": 3,
+          "details": {
+            "hardcoded share_window ignores config": "FAIL",
+            "window_size calculated but not used": "FAIL",
+            "config key mismatch": "FAIL"
+          },
+          "tokens_used": 0,
+          "time_seconds": 0.0020945072174072266
+        },
+        {
+          "name": "Payment System Bugs",
+          "passed": false,
+          "score": 0,
+          "max_score": 4,
+          "details": {
+            "race condition": "FAIL",
+            "sql injection": "FAIL",
+            "float precision": "FAIL",
+            "atomicity": "FAIL"
+          },
+          "tokens_used": 0,
+          "time_seconds": 0.0020279884338378906
+        },
+        {
+          "name": "Stratum Protocol Bugs",
+          "passed": false,
+          "score": 0,
+          "max_score": 5,
+          "details": {
+            "byte order / endianness": "FAIL",
+            "logging before submit / info leak": "FAIL",
+            "race condition / stale": "FAIL",
+            "memory leak / pruning": "FAIL",
+            "input validation / hex": "FAIL"
+          },
+          "tokens_used": 0,
+          "time_seconds": 0.0020465850830078125
+        }
+      ],
+      "throughput": 0.0
+    },
+    "parallel": null
+  }
+]

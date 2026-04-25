@@ -1,0 +1,22 @@
+[
+  {
+    "name": "Nemotron-3-Super-120B",
+    "api_url": "http://localhost:8001/v1",
+    "timestamp": "2026-03-28T00:05:01.163267",
+    "gpu_info": {
+      "name": "NVIDIA RTX A4000",
+      "memory_mb": 16376,
+      "driver": "570.211.01\nNVIDIA RTX A4000",
+      "detected": true
+    },
+    "server_config": {
+      "framework": "vllm",
+      "framework_version": "0.18.0"
+    },
+    "sequential": {
+      "tests": [],
+      "throughput": 0
+    },
+    "parallel": null
+  }
+]

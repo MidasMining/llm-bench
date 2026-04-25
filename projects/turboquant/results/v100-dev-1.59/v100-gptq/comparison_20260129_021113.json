@@ -1,0 +1,58 @@
+[
+  {
+    "name": "seed-oss-gptq",
+    "api_url": "http://localhost:8100/v1",
+    "timestamp": "2026-01-29T02:08:00.955335",
+    "gpu_info": {
+      "name": "Tesla PG503-216",
+      "memory_mb": 32768,
+      "driver": "570.195.03",
+      "detected": true
+    },
+    "sequential": {
+      "tests": [
+        {
+          "name": "ZMQ Listener Bug",
+          "passed": true,
+          "score": 2,
+          "max_score": 2,
+          "details": {
+            "socket creation in main thread": "PASS",
+            "zmq context not thread safe this way": "PASS"
+          },
+          "tokens_used": 2654,
+          "time_seconds": 60.78338694572449
+        },
+        {
+          "name": "PPLNS Mining Pool Bugs",
+          "passed": true,
+          "score": 3,
+          "max_score": 3,
+          "details": {
+            "hardcoded share_window ignores config": "PASS",
+            "window_size calculated but not used": "PASS",
+            "config key mismatch": "PASS"
+          },
+          "tokens_used": 3193,
+          "time_seconds": 65.73014235496521
+        },
+        {
+          "name": "Payment System Bugs",
+          "passed": true,
+          "score": 4,
+          "max_score": 4,
+          "details": {
+            "race condition": "PASS",
+            "sql injection": "PASS",
+            "float precision": "PASS",
+            "atomicity": "PASS"
+          },
+          "tokens_used": 3148,
+          "time_seconds": 64.97714138031006
+        }
+      ],
+      "throughput": 46.97356778798159
+    },
+    "parallel": null
+  }
+]

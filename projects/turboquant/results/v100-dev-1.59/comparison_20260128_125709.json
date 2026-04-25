@@ -1,0 +1,21 @@
+[
+  {
+    "name": "seed-oss",
+    "api_url": "http://localhost:8100/v1",
+    "timestamp": "2026-01-28T12:57:09.323364",
+    "tests": [
+      {
+        "name": "ZMQ Listener Bug",
+        "passed": false,
+        "score": 0,
+        "max_score": 2,
+        "details": {
+          "socket creation in main thread": "FAIL",
+          "zmq context not thread safe this way": "FAIL"
+        },
+        "tokens_used": 0,
+        "time_seconds": 0.01099085807800293
+      }
+    ]
+  }
+]

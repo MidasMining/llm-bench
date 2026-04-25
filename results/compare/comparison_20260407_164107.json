@@ -1,0 +1,74 @@
+[
+  {
+    "name": "/mnt/data500/models/Devstral-2-123B-GPTQ",
+    "api_url": "http://localhost:8001/v1",
+    "timestamp": "2026-04-07T16:37:43.521725",
+    "gpu_info": {
+      "name": "NVIDIA RTX A4000",
+      "memory_mb": 16376,
+      "driver": "570.211.01\nNVIDIA RTX A4000",
+      "detected": true
+    },
+    "server_config": {},
+    "sequential": {
+      "tests": [
+        {
+          "name": "ZMQ Listener Bug",
+          "passed": true,
+          "score": 2,
+          "max_score": 2,
+          "details": {
+            "socket creation in main thread": "PASS",
+            "zmq context not thread safe this way": "PASS"
+          },
+          "tokens_used": 1161,
+          "time_seconds": 25.49226665496826
+        },
+        {
+          "name": "PPLNS Mining Pool Bugs",
+          "passed": true,
+          "score": 3,
+          "max_score": 3,
+          "details": {
+            "hardcoded share_window ignores config": "PASS",
+            "window_size calculated but not used": "PASS",
+            "config key mismatch": "PASS"
+          },
+          "tokens_used": 2439,
+          "time_seconds": 55.046194076538086
+        },
+        {
+          "name": "Payment System Bugs",
+          "passed": true,
+          "score": 4,
+          "max_score": 4,
+          "details": {
+            "race condition": "PASS",
+            "sql injection": "PASS",
+            "float precision": "PASS",
+            "atomicity": "PASS"
+          },
+          "tokens_used": 3109,
+          "time_seconds": 84.36523008346558
+        },
+        {
+          "name": "Stratum Protocol Bugs",
+          "passed": true,
+          "score": 5,
+          "max_score": 5,
+          "details": {
+            "byte order / endianness": "PASS",
+            "logging before submit / info leak": "PASS",
+            "race condition / stale": "PASS",
+            "memory leak / pruning": "PASS",
+            "input validation / hex": "PASS"
+          },
+          "tokens_used": 2581,
+          "time_seconds": 38.93163728713989
+        }
+      ],
+      "throughput": 45.57600532988154
+    },
+    "parallel": null
+  }
+]

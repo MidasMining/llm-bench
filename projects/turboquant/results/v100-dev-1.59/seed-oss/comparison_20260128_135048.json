@@ -1,0 +1,81 @@
+[
+  {
+    "name": "seed-oss",
+    "api_url": "http://localhost:8100/v1",
+    "timestamp": "2026-01-28T13:00:48.521790",
+    "tests": [
+      {
+        "name": "ZMQ Listener Bug",
+        "passed": false,
+        "score": 0,
+        "max_score": 2,
+        "details": {
+          "socket creation in main thread": "FAIL",
+          "zmq context not thread safe this way": "FAIL"
+        },
+        "tokens_used": 0,
+        "time_seconds": 600.0954570770264
+      },
+      {
+        "name": "PPLNS Mining Pool Bugs",
+        "passed": false,
+        "score": 0,
+        "max_score": 3,
+        "details": {
+          "hardcoded share_window ignores config": "FAIL",
+          "window_size calculated but not used": "FAIL",
+          "config key mismatch": "FAIL"
+        },
+        "tokens_used": 0,
+        "time_seconds": 600.1012427806854
+      },
+      {
+        "name": "Payment System Bugs",
+        "passed": false,
+        "score": 0,
+        "max_score": 4,
+        "details": {
+          "race condition": "FAIL",
+          "sql injection": "FAIL",
+          "float precision": "FAIL",
+          "atomicity": "FAIL"
+        },
+        "tokens_used": 0,
+        "time_seconds": 600.0125036239624
+      },
+      {
+        "name": "Stratum Protocol Bugs",
+        "passed": false,
+        "score": 0,
+        "max_score": 5,
+        "details": {
+          "byte order / endianness": "FAIL",
+          "logging before submit / info leak": "FAIL",
+          "race condition / stale": "FAIL",
+          "memory leak / pruning": "FAIL",
+          "input validation / hex": "FAIL"
+        },
+        "tokens_used": 0,
+        "time_seconds": 600.0218515396118
+      },
+      {
+        "name": "HiveOS Wrapper Creation",
+        "passed": false,
+        "score": 1,
+        "max_score": 8,
+        "details": {
+          "uses heredocs": "FAIL",
+          "h-manifest with CUSTOM_NAME": "FAIL",
+          "uses CUSTOM_* variables": "FAIL",
+          "creates h-config.sh": "FAIL",
+          "creates h-run.sh with exec": "FAIL",
+          "creates h-stats.sh with JSON": "FAIL",
+          "correct directory structure": "FAIL",
+          "api port configured": "PASS"
+        },
+        "tokens_used": 0,
+        "time_seconds": 600.1012501716614
+      }
+    ]
+  }
+]

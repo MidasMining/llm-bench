@@ -1,0 +1,83 @@
+[
+  {
+    "name": "qwen3-coder",
+    "api_url": "http://108.231.238.253:19995/v1",
+    "timestamp": "2026-02-05T17:59:48.858303",
+    "gpu_info": {
+      "name": "NVIDIA RTX A4000",
+      "memory_mb": 16376,
+      "driver": "570.211.01\nNVIDIA RTX A4000",
+      "detected": true
+    },
+    "sequential": {
+      "tests": [],
+      "throughput": 0.0
+    },
+    "parallel": {
+      "optimal_concurrency": 4,
+      "peak_throughput": 158.53967220466336,
+      "results": [
+        {
+          "concurrency": 1,
+          "throughput": 107.47006953962733,
+          "per_request": 107.47006953962733,
+          "avg_latency": 23.894962549209595,
+          "p50_latency": 23.894962549209595,
+          "p95_latency": 23.894962549209595,
+          "successful": 1,
+          "failed": 0
+        },
+        {
+          "concurrency": 2,
+          "throughput": 145.22040652258872,
+          "per_request": 72.61020326129436,
+          "avg_latency": 39.009302735328674,
+          "p50_latency": 39.009302735328674,
+          "p95_latency": 39.00931763648987,
+          "successful": 2,
+          "failed": 0
+        },
+        {
+          "concurrency": 4,
+          "throughput": 158.53967220466336,
+          "per_request": 39.63491805116584,
+          "avg_latency": 58.58583515882492,
+          "p50_latency": 58.585689425468445,
+          "p95_latency": 78.12501907348633,
+          "successful": 4,
+          "failed": 0
+        },
+        {
+          "concurrency": 8,
+          "throughput": 150.18241658622966,
+          "per_request": 18.772802073278708,
+          "avg_latency": 97.66265913844109,
+          "p50_latency": 97.64073324203491,
+          "p95_latency": 156.28863668441772,
+          "successful": 8,
+          "failed": 0
+        },
+        {
+          "concurrency": 16,
+          "throughput": 150.18233975966362,
+          "per_request": 9.386396234978976,
+          "avg_latency": 173.75525572896004,
+          "p50_latency": 173.25661063194275,
+          "p95_latency": 310.3652648925781,
+          "successful": 16,
+          "failed": 0
+        },
+        {
+          "concurrency": 32,
+          "throughput": 143.7454441180412,
+          "per_request": 4.492045128688788,
+          "avg_latency": 309.60507278442384,
+          "p50_latency": 309.31340312957764,
+          "p95_latency": 579.3141272068024,
+          "successful": 30,
+          "failed": 2
+        }
+      ]
+    }
+  }
+]

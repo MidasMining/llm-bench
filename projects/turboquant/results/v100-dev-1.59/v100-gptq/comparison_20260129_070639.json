@@ -1,0 +1,156 @@
+[
+  {
+    "name": "seed-oss-gptq",
+    "api_url": "http://localhost:8100/v1",
+    "timestamp": "2026-01-29T06:35:53.524996",
+    "gpu_info": {
+      "name": "Unknown",
+      "memory_mb": 0,
+      "driver": "Unknown",
+      "detected": false
+    },
+    "sequential": {
+      "tests": [
+        {
+          "name": "ZMQ Listener Bug",
+          "passed": true,
+          "score": 2,
+          "max_score": 2,
+          "details": {
+            "socket creation in main thread": "PASS",
+            "zmq context not thread safe this way": "PASS"
+          },
+          "tokens_used": 2654,
+          "time_seconds": 59.91067361831665
+        },
+        {
+          "name": "PPLNS Mining Pool Bugs",
+          "passed": true,
+          "score": 3,
+          "max_score": 3,
+          "details": {
+            "hardcoded share_window ignores config": "PASS",
+            "window_size calculated but not used": "PASS",
+            "config key mismatch": "PASS"
+          },
+          "tokens_used": 3193,
+          "time_seconds": 63.375624656677246
+        },
+        {
+          "name": "Payment System Bugs",
+          "passed": false,
+          "score": 3,
+          "max_score": 4,
+          "details": {
+            "race condition": "PASS",
+            "sql injection": "PASS",
+            "float precision": "FAIL",
+            "atomicity": "PASS"
+          },
+          "tokens_used": 3148,
+          "time_seconds": 63.18739938735962
+        },
+        {
+          "name": "Stratum Protocol Bugs",
+          "passed": true,
+          "score": 5,
+          "max_score": 5,
+          "details": {
+            "byte order / endianness": "PASS",
+            "logging before submit / info leak": "PASS",
+            "race condition / stale": "PASS",
+            "memory leak / pruning": "PASS",
+            "input validation / hex": "PASS"
+          },
+          "tokens_used": 3872,
+          "time_seconds": 71.14485168457031
+        },
+        {
+          "name": "HiveOS Wrapper Creation",
+          "passed": true,
+          "score": 8,
+          "max_score": 8,
+          "details": {
+            "uses heredocs": "PASS",
+            "h-manifest with CUSTOM_NAME": "PASS",
+            "uses CUSTOM_* variables": "PASS",
+            "creates h-config.sh": "PASS",
+            "creates h-run.sh with exec": "PASS",
+            "creates h-stats.sh with JSON": "PASS",
+            "correct directory structure": "PASS",
+            "api port configured": "PASS"
+          },
+          "tokens_used": 2435,
+          "time_seconds": 59.28701663017273
+        }
+      ],
+      "throughput": 48.285677636554695
+    },
+    "parallel": {
+      "optimal_concurrency": 16,
+      "peak_throughput": 139.0086178546492,
+      "results": [
+        {
+          "concurrency": 1,
+          "throughput": 43.94698492412417,
+          "per_request": 43.94698492412417,
+          "avg_latency": 60.390867471694946,
+          "p50_latency": 60.390867471694946,
+          "p95_latency": 60.390867471694946,
+          "successful": 1,
+          "failed": 0
+        },
+        {
+          "concurrency": 2,
+          "throughput": 80.17366235485908,
+          "per_request": 40.08683117742954,
+          "avg_latency": 72.91290092468262,
+          "p50_latency": 72.91290092468262,
+          "p95_latency": 72.92907381057739,
+          "successful": 2,
+          "failed": 0
+        },
+        {
+          "concurrency": 4,
+          "throughput": 123.15516467014471,
+          "per_request": 30.78879116753618,
+          "avg_latency": 104.45647674798965,
+          "p50_latency": 104.45620226860046,
+          "p95_latency": 104.47784447669983,
+          "successful": 4,
+          "failed": 0
+        },
+        {
+          "concurrency": 8,
+          "throughput": 139.0086178546492,
+          "per_request": 17.37607723183115,
+          "avg_latency": 174.77269035577774,
+          "p50_latency": 174.78565776348114,
+          "p95_latency": 174.78614234924316,
+          "successful": 8,
+          "failed": 0
+        },
+        {
+          "concurrency": 16,
+          "throughput": 134.82872004900506,
+          "per_request": 8.426795003062816,
+          "avg_latency": 341.09551702439785,
+          "p50_latency": 336.092467546463,
+          "p95_latency": 360.16042971611023,
+          "successful": 16,
+          "failed": 0
+        },
+        {
+          "concurrency": 32,
+          "throughput": 57.07463785398343,
+          "per_request": 1.7835824329369823,
+          "avg_latency": 535.9342125852903,
+          "p50_latency": 534.2385841608047,
+          "p95_latency": 554.749752998352,
+          "successful": 12,
+          "failed": 20
+        }
+      ]
+    }
+  }
+]
