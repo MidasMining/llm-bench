@@ -1,0 +1,41 @@
+SSH into my HiveOS worker at {TARGET_HOST}. The pasted prompt is the task relevant to that rig:
+
+**Prompt for LLM technician:**
+
+> I have a Nosana GPU worker node running on a HiveOS rig. The node runs inside a nested container stack: the host runs Docker, Docker runs a `podman` container, and inside that podman runs the `nosana-node` container (Node.js application).
+>
+> Jobs are failing with this error in the nosana-node logs:
+> ```
+> Error finishing job BANjb64QDk6jzqFzYrX4gpcW3EMpwKowwmoksLYKquTG
+> Message: Failed to finish job: Error: queryAaaa ETIMEOUT nosana.mypinata.cloud
+> ```
+>
+> The error happens during job result upload. The GPU computation finishes fine. My network does not have IPv6 connectivity — there are no IPv6 addresses on any host interface, and no IPv6 routes. However, DNS servers still return AAAA records for `nosana.mypinata.cloud`.
+>
+> To access the logs:
+> ```bash
+> sudo docker exec podman podman logs --tail=100 nosana-node 2>&1
+> ```
+> Note: the output contains ANSI escape codes and carriage returns instead of newlines. Strip them with: `sed 's/\x1b\[[0-9;]*[a-zA-Z]//g' | tr '\r' '\n'`
+>
+> The fix that has worked on other rigs is to recreate the nosana-node container with the environment variable `NODE_OPTIONS=--dns-result-order=ipv4first`, which tells Node.js to prefer IPv4 addresses when DNS returns both A and AAAA records.
+>
+> To recreate the container:
+> ```bash
+> sudo docker exec podman podman stop nosana-node
+> sudo docker exec podman podman rm nosana-node
+> sudo docker exec -it podman podman run --pull=always --name nosana-node \
+>   --network NOSANA_GATEWAY --interactive -t \
+>   --volume /root/.nosana/:/root/.nosana/ \
+>   --mount type=bind,source=/root/../podman.sock,target=/root/.nosana/podman/podman.sock \
+>   -e CLI_VERSION= \
+>   -e NODE_OPTIONS=--dns-result-order=ipv4first \
+>   docker.io/nosana/nosana-node:latest start --network mainnet
+> ```
+>
+> Please:
+> 1. SSH into the rig and confirm the AAAA timeout error exists in the logs
+> 2. Verify the rig has no IPv6 connectivity (`ip -6 addr show`, `ping6 -c1 google.com`)
+> 3. Check if `NODE_OPTIONS` is already set in the current container (`sudo docker exec podman podman inspect nosana-node --format "{{json .Config.Env}}"`)
+> 4. If not set, apply the fix by recreating the container with the command above
+> 5. Monitor logs for 5 minutes to confirm no new AAAA timeout errors appear
