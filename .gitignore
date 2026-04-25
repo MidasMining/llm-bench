@@ -3,3 +3,11 @@ __pycache__/
 *.pyo
 .env
 *.log
+
+# secrets / credentials
+.webui_secret_key
+*.pem
+*.key
+
+# transient quantization workspace
+gptqmodel_offload/
