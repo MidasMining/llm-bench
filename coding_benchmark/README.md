@@ -21,9 +21,10 @@ against a gold reference.
 1. Generate a deterministic synthetic input BAM (~100 reads across
    chr1/chr2/chr3 with varied MAPQ and flags) and a gold output BAM by
    applying the scenario's filter directly.
-2. Send the task prompt to the chat completions endpoint with three tools:
-   `write_file`, `read_file`, `run_command`. All paths are confined to the
-   sandbox workdir.
+2. Send the task prompt to the chat completions endpoint with four tools:
+   `submit_plan`, `write_file`, `read_file`, `run_command`. The runner gates
+   the file/exec tools — they return an error until `submit_plan` has been
+   called. All paths are confined to the sandbox workdir.
 3. Loop up to `--max-turns` (default 20). Each turn the model either emits
    tool calls or stops voluntarily.
 4. After the loop, score the run on five axes (see below) and write a JSON
@@ -38,7 +39,8 @@ you can read evidence rather than just a number.
 |---|---|---|
 | **api_correctness** | confabulated pysam method/attr names | AST-walks `solution.py`, checks every `pysam.X.Y...` chain via `getattr` against installed pysam |
 | **functional** | plausible-looking but wrong output | Compares model's `output.bam` to gold by `(chrom, pos, flag, qname)`; exact-order match = 1.0, set-jaccard otherwise |
-| **plan** | abandons plan / never plans | Counts numbered/bulleted items in first assistant turn; 3-8 = 1.0, 1-2 = 0.5, 0 = 0.0 |
+| **plan** | never planned / planned late | Did the model call `submit_plan` first with ≥3 steps? 1.0 yes, 0.5 if late or too few, 0.0 if never. Revision count is logged separately (not penalized). |
+| **plan_adherence** | planned but didn't follow through | For each step in the FINAL submitted plan, did any later non-plan tool call reference its content (substring-match informative tokens)? Score = matched / total. |
 | **required_files** | missing sort/index/stats outputs | Checks each required filename exists in the workdir |
 | **voluntary_termination** | claims success without verifying / oscillates | Boolean: did the model stop on its own, or hit `--max-turns`? |
 

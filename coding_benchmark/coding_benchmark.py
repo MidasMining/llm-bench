@@ -90,6 +90,30 @@ def execute_tool(name, args, workdir):
 
 TOOLS = [
     {"type": "function", "function": {
+        "name": "submit_plan",
+        "description": (
+            "Submit your plan before doing any other work. You MUST call this first; "
+            "write_file, read_file, and run_command will return an error until you do. "
+            "Provide 3-7 ordered steps describing your approach. "
+            "If you later encounter unexpected issues (failed tests, missing methods, wrong assumptions), "
+            "call this tool again with revised steps and a brief revision_reason — revisions are logged but not penalized."
+        ),
+        "parameters": {
+            "type": "object", "required": ["steps"],
+            "properties": {
+                "steps": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Ordered list of plan steps (one sentence each).",
+                },
+                "revision_reason": {
+                    "type": "string",
+                    "description": "If revising a previously submitted plan, briefly explain why.",
+                },
+            },
+        },
+    }},
+    {"type": "function", "function": {
         "name": "write_file",
         "description": "Write a file. Paths are relative to the workdir; cannot escape it.",
         "parameters": {
@@ -176,9 +200,11 @@ def main():
             "scenario_name": scenario["name"],
             "workdir": str(workdir), "turns": 0,
             "tool_calls": [], "model_response_texts": [],
+            "plan_history": [],
             "voluntary_termination": None, "malformed_args": 0,
             "start_time": time.strftime("%Y-%m-%d %H:%M:%S"),
         }
+        plan_submitted = False
 
         for turn in range(args.max_turns):
             log["turns"] = turn + 1
@@ -224,7 +250,22 @@ def main():
                                          "content": "error: arguments JSON did not parse"})
                         continue
                     print(f"  Tool: {fn['name']}({json.dumps(tool_args)[:160]})")
-                    output = execute_tool(fn["name"], tool_args, workdir)
+                    if fn["name"] == "submit_plan":
+                        steps = tool_args.get("steps", []) or []
+                        reason = tool_args.get("revision_reason")
+                        log["plan_history"].append({
+                            "turn": turn + 1, "steps": steps, "revision_reason": reason,
+                        })
+                        plan_submitted = True
+                        rev = len(log["plan_history"]) - 1
+                        output = (f"plan accepted ({len(steps)} steps)" if rev == 0
+                                  else f"plan revised — revision #{rev} accepted ({len(steps)} steps)")
+                    elif not plan_submitted:
+                        output = ("error: submit_plan must be called first. "
+                                  "Submit your approach as 3-7 steps via submit_plan(steps=[...]) "
+                                  "before using write_file, read_file, or run_command.")
+                    else:
+                        output = execute_tool(fn["name"], tool_args, workdir)
                     print(f"  Output: {output[:200]}")
                     log["tool_calls"].append({
                         "turn": turn + 1, "tool": fn["name"], "args": tool_args,
@@ -247,7 +288,8 @@ def main():
             log["scoring"]["functional"] = scoring.check_functional(str(out_bam), str(gold_bam))
         else:
             log["scoring"]["functional"] = {"error": "no output.bam produced", "score": 0.0, "match": False}
-        log["scoring"]["plan"] = scoring.check_plan(messages)
+        log["scoring"]["plan"] = scoring.check_plan(log["plan_history"], log["tool_calls"])
+        log["scoring"]["plan_adherence"] = scoring.check_plan_adherence(log["plan_history"], log["tool_calls"])
         log["scoring"]["required_files"] = scoring.check_required_files(workdir, scenario["required_output_files"])
 
         log["end_time"] = time.strftime("%Y-%m-%d %H:%M:%S")
