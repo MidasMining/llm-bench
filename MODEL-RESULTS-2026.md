@@ -33,6 +33,20 @@ Last updated: 2026-04-09
 | Qwen3.5-35B-A3B | 35B / 3B MoE | BF16 | 8 | **100%** | 12/30 (40%) | 168 | Mentioned pipe truncation |
 | Qwen3.5-27B | 27B dense | BF16 | 4-8 | **100%** | 8/30 (27%) | 58 | Worst domain knowledge |
 
+### V100 (Single GPU, 32GB) — vLLM-tq + 1Cat TurboMind SM70 GEMM port
+
+| Model | Params | Quant | Standard (21) | BWA-MEM2 (30) | Speed (t/s) | KV | Notes |
+|-------|--------|-------|---------------|---------------|-------------|-----|-------|
+| **Qwen3.6-35B-A3B-AWQ** | 35B / 3B MoE | AWQ INT4 | **22/21 (105%)** | **18/30 (60%)** | 49.4 @ 14K | tq-t3nc (155K) | V100+TQ+TurboMind GEMM. Beats 35B-class band (+6) and Qwen3.5-122B (+3 BWA). |
+
+**V100 stack notes:**
+- Hardware: 1× Tesla V100 32GB (SM70 / Volta)
+- Attention: TurboQuant tq-t3nc (3-bit MSE keys + 3-bit values + norm correction, ~5× KV compression, 155K context)
+- Linear: 1Cat TurboMind SM70 m8n8k4 WMMA GEMM (replaces AWQ-Marlin which requires SM75+)
+- Decode kernel optimization: D-light autotune of TQ Triton stage1 (num_warps 4→2, +1-2% e2e)
+- Optional: Path B-scratch flash decode via `VLLM_TQ_FLASH_DECODE=1` (+4% at 14K, -5% at 4K — workload-dependent switch)
+- Standard bench needs `enable_thinking=False` or `max_tokens >= 8000` for reasoning models; default 4096 truncates Qwen3.6 mid-think.
+
 ### Tier 3: From Original Benchmark (Feb 2026, vLLM 0.14)
 
 | Model | Params | Quant | Standard (22) | Speed (t/s) | Notes |
@@ -86,11 +100,13 @@ Last updated: 2026-04-09
 | Scope to BWAMEM2_MEM | All models | — |
 
 ### Correlation: Model size vs domain score
-| Size range | Best BWA-MEM2 score |
-|-----------|-------------------|
-| 27-35B | 8-12/30 |
-| 120-139B | 21-24/30 |
-| 398B (Trinity, hosted) | ~30/30 |
+| Size range | Historical band | Notable outlier |
+|-----------|-----------------|-----------------|
+| 27-35B | 8-12/30 | **Qwen3.6-35B-A3B-AWQ: 18/30** (V100, this update) |
+| 120-139B | 21-24/30 | — |
+| 398B (Trinity, hosted) | ~30/30 | — |
+
+Qwen3.6-35B-A3B raises the 35B-class ceiling by +6. Improvements come from systems-reasoning dimensions (retry strategy, scope, isolation) rather than the headline domain identification (AVX-512 high-core pipe corruption — still missed).
 
 ---
 

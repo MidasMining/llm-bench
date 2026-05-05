@@ -285,12 +285,18 @@ The repo holds two kinds of content:
 
 ### Tesla V100 (Single GPU, 32GB)
 
-| Model | Quant | Quality | Throughput |
-|-------|-------|:-------:|-----------|
-| Seed-OSS-36B | GPTQ | 95.5% (21/22) | 48.3 t/s |
-| Seed-OSS-36B | AWQ | 95.5% (21/22) | 7.0 t/s |
+| Model | Quant | Standard | BWA-MEM2 | Throughput | KV |
+|-------|-------|:-------:|:--------:|-----------|-----|
+| Qwen3.6-35B-A3B | AWQ | **22/21** (105%) | **18/30** (60%) | 49.4 t/s @ 14K | TQ-t3nc (155K ctx) |
+| Seed-OSS-36B | GPTQ | 95.5% (21/22) | — | 48.3 t/s | fp16 |
+| Seed-OSS-36B | AWQ | 95.5% (21/22) | — | 7.0 t/s | fp16 |
 
-**V100 Finding**: GPTQ is 7x faster than AWQ on Volta (native CUDA kernels vs Triton fallback).
+**V100 Findings**:
+
+1. **GPTQ → AWQ parity restored on Volta.** The historical "GPTQ 7× faster than AWQ on V100" was caused by AWQ falling back to Triton (Marlin requires SM75+). Porting [InternLM/lmdeploy](https://github.com/InternLM/lmdeploy)'s TurboMind SM70 m8n8k4 WMMA GEMM kernels (via [1CatAI/1Cat-vLLM](https://github.com/1CatAI/1Cat-vLLM)) closes the gap and makes modern AWQ-quantized models — including MoE — viable on V100.
+2. **TurboQuant + TurboMind stack runs Qwen3.6-35B-A3B at 49.4 t/s with 155K context** on a single V100 32GB. tq-t3nc (3-bit MSE keys, 3-bit values, norm-correction; ~5× KV compression) preserves quality through the practical bench; flash-decode-via-dequant-scratch path is opt-in (`VLLM_TQ_FLASH_DECODE=1`) and gains another +4% at long context.
+3. **BWA-MEM2 score 18/30 (Qwen3.6) is +6 above the historical 35B-class band** (8-12/30). Outperforms Qwen3.5-122B-A10B (15/30) — model 4× larger — on this domain test. See `docs/bwamem2-benchmark.md` for the rubric.
+4. **Reasoning models need budget headroom on the practical bench.** The default `max_tokens=4096` is too small for Qwen3.6's deep thinking; the model uses the entire budget reasoning before producing an answer (`finish_reason: length`, content empty). Either disable thinking via `chat_template_kwargs={"enable_thinking": False}` for parity with non-reasoning baselines, or bump `max_tokens` to 8K+. Qwen3.6 with thinking disabled scores 22/21 (perfect+).
 
 ---
 
