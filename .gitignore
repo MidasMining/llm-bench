@@ -11,3 +11,9 @@ __pycache__/
 
 # transient quantization workspace
 gptqmodel_offload/
+
+# Loose top-level comparison results that were never categorized into
+# project subdirs. These are stale (Apr 28-29 sweep, never used as
+# evidence in any analysis). Categorized results belong in
+# results/<project>/ and are committed normally.
+results/comparison_*.json
