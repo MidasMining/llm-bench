@@ -223,7 +223,7 @@ See the README in each patches dir for the diff and apply instructions.
 # Install
 pip install pyyaml requests
 
-# Run against a model server
+# Quality bench (5 prompts, 22 pass/fail checks against rubric)
 python compare_models.py --model <model-id> --api-url http://localhost:8000/v1
 
 # With parallel throughput test
@@ -233,7 +233,23 @@ python compare_models.py --model <model-id> --api-url http://localhost:8000/v1 -
 python compare_models.py --model <model-id> --api-url http://localhost:8000/v1 \
   --parallel --tp 8 --framework vllm --quant-method awq \
   --output ./results/8xA4000
+
+# Decode-rate benchmark (single-stream, isolates decode from prefill cost)
+python decode_rate_bench.py --api-url http://localhost:8000/v1 --model <model-id> \
+  --tag "config description" --targets 500 2000 4000 8000 14000
 ```
+
+### When to use which
+
+| Tool | Purpose | Output |
+|------|---------|--------|
+| `compare_models.py` | "Is this model worth running?" | Quality score (22-check rubric) + ballpark throughput |
+| `decode_rate_bench.py` | "How fast is this kernel/config?" | Pure single-stream decode rate (t/s) at varying context, separated TTFT, handles `reasoning_content` deltas |
+| `parallel_benchmark.py` | Multi-stream peak throughput | Concurrency-scaling t/s curve |
+| `long_context_test.py` | Functional test at long context | Pass/fail at target ctx |
+| `tool_call_benchmark/` | Multi-step SSH tool-call reliability | See subdir README |
+
+`decode_rate_bench.py` is the canonical "how fast does it decode?" tool — use it when comparing kernels, KV-quant settings, or autotune results. `compare_models.py` reports throughput as a side effect of quality testing, but its numbers are distorted by reasoning-token accounting on thinking models. For honest decode-rate comparisons, prefer `decode_rate_bench.py`.
 
 For the multi-step SSH tool-call reliability bench, see `tool_call_benchmark/README.md`.
 
@@ -241,9 +257,10 @@ For the multi-step SSH tool-call reliability bench, see `tool_call_benchmark/REA
 
 ```
 llm-bench/
-├── compare_models.py              # main benchmark harness (v2.1)
-├── parallel_benchmark.py          # standalone throughput benchmark
-├── long_context_test.py           # long-context test
+├── compare_models.py              # main benchmark harness (v2.1) — quality scoring
+├── decode_rate_bench.py           # single-stream decode-rate bench, SSE-streaming, separates TTFT
+├── parallel_benchmark.py          # standalone throughput benchmark (concurrency-scaling)
+├── long_context_test.py           # long-context functional test
 ├── models.yaml                    # model configurations
 ├── CONSOLIDATED-FINDINGS.md       # detailed analysis and findings (8x A4000 sweep)
 ├── MODEL-RESULTS-2026.md          # cross-model results summary
