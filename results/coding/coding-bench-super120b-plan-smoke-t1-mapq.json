@@ -1,0 +1,50 @@
+{
+  "variant": "super120b-plan-smoke",
+  "model": "/home/llm/models/Nemotron-3-Super-120B-AWQ-4bit",
+  "scenario": "t1-mapq",
+  "scenario_name": "T1: MAPQ filter only",
+  "workdir": "/tmp/coding_bench_t1-mapq_mwpvf_a6",
+  "turns": 1,
+  "tool_calls": [],
+  "model_response_texts": [
+    "\n{\n  \"plan\": \"Submit initial plan: 1) Check input BAM exists and is valid. 2) Open input BAM with pysam for reading. 3) Create output BAM with same header, write filtered reads (MAPQ >= 30). 4) Sort output BAM by coordinate if needed (though writing in input order may preserve sort if input is sorted). 5) Index output BAM. We'll implement in solution.py, run it, then verify output.\",\n  \"steps\": [\n    \"Check that input.bam exists and is readable.\",\n    \"Open input.bam with pysam.AlignmentFile in read mode.\",\n    \"Create output.bam with pysam.AlignmentFile in write mode, using the same header as input.\",\n    \"Iterate over reads in input, write those with mapping quality >= 30 to output.\",\n    \"Close both files, then sort output.bam by coordinate (if not already sorted) and create index.\",\n    \"Verify output by checking a few reads and ensuring index exists.\",\n    \"If any step fails, adjust and retry.\"\n  ]\n}"
+  ],
+  "plan_history": [],
+  "voluntary_termination": true,
+  "malformed_args": 0,
+  "start_time": "2026-05-03 20:54:25",
+  "scoring": {
+    "api_correctness": {
+      "error": "file not found: /tmp/coding_bench_t1-mapq_mwpvf_a6/solution.py",
+      "score": 0.0
+    },
+    "functional": {
+      "error": "no output.bam produced",
+      "score": 0.0,
+      "match": false
+    },
+    "plan": {
+      "score": 0.0,
+      "plan_count": 0,
+      "revision_count": 0,
+      "was_first_tool": false,
+      "note": "submit_plan never called"
+    },
+    "plan_adherence": {
+      "score": 0.0,
+      "note": "no plan to compare against"
+    },
+    "required_files": {
+      "required": [
+        "output.bam",
+        "output.bam.bai"
+      ],
+      "missing": [
+        "output.bam",
+        "output.bam.bai"
+      ],
+      "score": 0.0
+    }
+  },
+  "end_time": "2026-05-03 20:54:42"
+}

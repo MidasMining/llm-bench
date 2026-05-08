@@ -1,0 +1,219 @@
+{
+  "variant": "minimax27-r1",
+  "model": "/home/llm/models/MiniMax-M2.7-REAP-172B-AWQ",
+  "scenario": "t1-mapq",
+  "scenario_name": "T1: MAPQ filter only",
+  "workdir": "/tmp/coding_bench_t1-mapq_p3xjim8r",
+  "turns": 20,
+  "tool_calls": [
+    {
+      "turn": 1,
+      "tool": "run_command",
+      "args": {
+        "command": "python -c \"import pysam; help(pysam.AlignmentFile)\" 2>&1 | head -100"
+      },
+      "output": "[exit 0]\n/bin/sh: 1: python: not found\n"
+    },
+    {
+      "turn": 2,
+      "tool": "run_command",
+      "args": {
+        "command": "python3 -c \"import pysam; help(pysam.AlignmentFile)\" 2>&1 | head -150"
+      },
+      "output": "[exit 0]\nHelp on class AlignmentFile in module pysam.libcalignmentfile:\n\nclass AlignmentFile(pysam.libchtslib.HTSFile)\n |  AlignmentFile(filepath_or_object, mode=None, template=None,\n |  reference_names=None, reference_lengths=None, text=NULL,\n |  header=None, add_sq_text=False, check_header=True, check_sq=True,\n |  reference_filename=None, filename=None, index_filename=None,\n |  filepath_index=None, require_index=False, duplicate_filehandle=True,\n |  ignore_truncation=False, threads=1)\n |\n |  A :term:`SAM`/:term:`BAM`/:term:`CRAM` formatted file.\n |\n |  If `filepath_or_object` is a string, the file is automatically\n |  opened. If `filepath_or_object` is a python File object, the\n |  already opened file will be used.\n |\n |  If the file is opened for reading and an index exists (if file is BAM, a\n |  .bai file or if CRAM a .crai file), it will be opened automatically.\n |  `index_filename` may be specified explicitly. If the index is not named\n |  in the standard manner, not located in the same directory as the\n |  BAM/CRAM file, or is remote.  Without an index, random access via\n |  :meth:`~pysam.AlignmentFile.fetch` and :meth:`~pysam.AlignmentFile.pileup`\n |  is disabled.\n |\n |  For writing, the header of a :term:`SAM` file/:term:`BAM` file can\n |  be constituted from several sources (see also the samtools format\n |  specification):\n |\n |      1. If `template` is given, the header is copied from another\n |         `AlignmentFile` (`template` must be a\n |         :class:`~pysa"
+    },
+    {
+      "turn": 3,
+      "tool": "run_command",
+      "args": {
+        "command": "python3 -c \"import pysam; help(pysam.AlignmentFile.next)\" 2>&1 | head -50"
+      },
+      "output": "[exit 0]\nTraceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nAttributeError: type object 'pysam.libcalignmentfile.AlignmentFile' has no attribute 'next'. Did you mean: 'text'?\n"
+    },
+    {
+      "turn": 4,
+      "tool": "run_command",
+      "args": {
+        "command": "python3 -c \"import pysam; print([m for m in dir(pysam.Alignment) if not m.startswith('_')])\" 2>&1"
+      },
+      "output": "[exit 1]\nTraceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nAttributeError: module 'pysam' has no attribute 'Alignment'. Did you mean: 'AlignmentFile'?\n"
+    },
+    {
+      "turn": 5,
+      "tool": "run_command",
+      "args": {
+        "command": "python3 -c \"import pysam; print([m for m in dir(pysam) if not m.startswith('_')])\" 2>&1"
+      },
+      "output": "[exit 0]\n['AlignedRead', 'AlignedSegment', 'AlignmentFile', 'AlignmentHeader', 'BCFIndex', 'BCFIterator', 'BGZFile', 'BaseIndex', 'BaseIterator', 'BedProxy', 'CBACK', 'CDEL', 'CDIFF', 'CEQUAL', 'CHARD_CLIP', 'CIGAR_OPS', 'CINS', 'CMATCH', 'CPAD', 'CREF_SKIP', 'CSOFT_CLIP', 'FDUP', 'FMREVERSE', 'FMUNMAP', 'FPAIRED', 'FPROPER_PAIR', 'FQCFAIL', 'FREAD1', 'FREAD2', 'FREVERSE', 'FSECONDARY', 'FSUPPLEMENTARY', 'FUNMAP', 'FastaFile', 'Fastafile', 'FastqFile', 'FastqProxy', 'FastxFile', 'FastxRecord', 'GFF3Proxy', 'GTFProxy', 'GZIterator', 'GZIteratorHead', 'HFile', 'HTSFile', 'IndexedReads', 'IteratorColumn', 'IteratorRow', 'KEY_NAMES', 'NamedTupleProxy', 'Pileup', 'PileupColumn', 'PileupRead', 'SAM_FLAGS', 'Samfile', 'SamtoolsError', 'TabixFile', 'TabixIndex', 'TabixIterator', 'Tabixfile', 'TupleProxy', 'VCF', 'VCFProxy', 'VCFRecord', 'VariantContig', 'VariantFile', 'VariantHeader', 'VariantHeaderContigs', 'VariantHeaderMetadata', 'VariantHeaderRecord', 'VariantHeaderRecords', 'VariantHeaderSamples', 'VariantMetadata', 'VariantRecord', 'VariantRecordFilter', 'VariantRecordFormat', 'VariantRecordInfo', 'VariantRecordSample', 'VariantRecordSamples', 'addreplacerg', 'ampliconclip', 'ampliconstats', 'array_to_qualitystring', 'asBed', 'asGFF3', 'asGTF', 'asTuple', 'asVCF', 'bam2fq', 'bamshuf', 'bedcov', 'calmd', 'cat', 'collate', 'config', 'consensus', 'coverage', 'cram_size', 'depad', 'depth', 'dict', 'faidx', 'fasta', 'fastq', 'fixmate', 'flags', 'flagstat', 'fqidx', 'fqimport', 'get_"
+    },
+    {
+      "turn": 6,
+      "tool": "run_command",
+      "args": {
+        "command": "python3 -c \"import pysam; help(pysam.AlignedSegment)\" 2>&1 | head -100"
+      },
+      "output": "[exit 0]\nHelp on class AlignedSegment in module pysam.libcalignedsegment:\n\nclass AlignedSegment(builtins.object)\n |  AlignedSegment(AlignmentHeader header=None)\n |\n |  Class representing an aligned segment.\n |\n |  This class stores a handle to the samtools C-structure representing\n |  an aligned read. Member read access is forwarded to the C-structure\n |  and converted into python objects. This implementation should be fast,\n |  as only the data needed is converted.\n |\n |  For write access, the C-structure is updated in-place. This is\n |  not the most efficient way to build BAM entries, as the variable\n |  length data is concatenated and thus needs to be resized if\n |  a field is updated. Furthermore, the BAM entry might be\n |  in an inconsistent state.\n |\n |  One issue to look out for is that the sequence should always\n |  be set *before* the quality scores. Setting the sequence will\n |  also erase any quality scores that were set previously.\n |\n |  Parameters\n |  ----------\n |\n |  header:\n |       :class:`~pysam.AlignmentHeader` object to map numerical\n |       identifiers to chromosome names. If not given, an empty\n |       header is created.\n |\n |  Methods defined here:\n |\n |  __copy__(self)\n |      AlignedSegment.__copy__(self)\n |\n |  __deepcopy__(self, memo)\n |      AlignedSegment.__deepcopy__(self, memo)\n |\n |  __eq__(self, value, /)\n |      Return self==value.\n |\n |  __ge__(self, value, /)\n |      Return self>=value.\n |\n |  __gt__(self, value, /)\n |      Return self>v"
+    },
+    {
+      "turn": 7,
+      "tool": "run_command",
+      "args": {
+        "command": "python3 -c \"import pysam; help(pysam.AlignedSegment.mapq)\" 2>&1"
+      },
+      "output": "[exit 0]\nHelp on getset descriptor pysam.libcalignedsegment.AlignedSegment.mapq:\n\nmapq\n    deprecated, use :attr:`mapping_quality` instead.\n\n"
+    },
+    {
+      "turn": 8,
+      "tool": "run_command",
+      "args": {
+        "command": "python3 -c \"import pysam; help(pysam.AlignedSegment.mapping_quality)\" 2>&1"
+      },
+      "output": "[exit 0]\nHelp on getset descriptor pysam.libcalignedsegment.AlignedSegment.mapping_quality:\n\nmapping_quality\n    mapping quality\n\n"
+    },
+    {
+      "turn": 9,
+      "tool": "run_command",
+      "args": {
+        "command": "python3 -c \"import pysam; help(pysam.AlignmentFile.close)\" 2>&1"
+      },
+      "output": "[exit 0]\nHelp on cython_function_or_method in module pysam.libcalignmentfile:\n\nclose(self)\n    AlignmentFile.close(self)\n\n    closes the :class:`pysam.AlignmentFile`.\n\n"
+    },
+    {
+      "turn": 10,
+      "tool": "run_command",
+      "args": {
+        "command": "python3 -c \"import pysam; print([m for m in dir(pysam.AlignmentFile) if not m.startswith('__')])\" 2>&1"
+      },
+      "output": "[exit 0]\n['_open', 'add_hts_options', 'category', 'check_index', 'check_truncation', 'close', 'closed', 'compression', 'count', 'count_coverage', 'description', 'duplicate_filehandle', 'fetch', 'filename', 'find_introns', 'find_introns_slow', 'flush', 'format', 'get_index_statistics', 'get_reference_length', 'get_reference_name', 'get_tid', 'getrname', 'gettid', 'has_index', 'head', 'header', 'index_filename', 'is_bam', 'is_bcf', 'is_closed', 'is_cram', 'is_open', 'is_read', 'is_remote', 'is_sam', 'is_stream', 'is_valid_reference_name', 'is_valid_tid', 'is_vcf', 'is_write', 'lengths', 'mapped', 'mate', 'mode', 'nocoordinate', 'nreferences', 'parse_region', 'pileup', 'reference_filename', 'references', 'reset', 'seek', 'tell', 'text', 'threads', 'unmapped', 'version', 'write']\n"
+    },
+    {
+      "turn": 11,
+      "tool": "run_command",
+      "args": {
+        "command": "python3 -c \"import pysam; print([m for m in dir(pysam) if 'index' in m.lower()])\" 2>&1"
+      },
+      "output": "[exit 0]\n['BCFIndex', 'BaseIndex', 'IndexedReads', 'TabixIndex', 'index', 'tabix_index']\n"
+    },
+    {
+      "turn": 12,
+      "tool": "run_command",
+      "args": {
+        "command": "python3 -c \"import pysam; help(pysam.index)\" 2>&1"
+      },
+      "output": "[exit 0]\nHelp on PysamDispatcher in module pysam.utils object:\n\nclass PysamDispatcher(builtins.object)\n |  PysamDispatcher(collection: str, dispatch: str, parsers: Optional[Iterable[Tuple[str, Callable[[Union[str, List[str]]], Union[str, List[str]]]]]] = None)\n |\n |  The dispatcher emulates the samtools/bctools command line.\n |\n |  Captures stdout and stderr.\n |\n |  Raises a :class:`pysam.SamtoolsError` exception in case samtools\n |  exits with an error code other than 0.\n |\n |  Some command line options are associated with parsers.  For\n |  example, the samtools command \"pileup -c\" creates a tab-separated\n |  table on standard output. In order to associate parsers with\n |  options, an optional list of parsers can be supplied. The list\n |  will be processed in order checking for the presence of each\n |  option.\n |\n |  If no parser is given or no appropriate parser is found, the\n |  stdout output of samtools/bcftools commands will be returned.\n |\n |  Methods defined here:\n |\n |  __call__(self, *args: str, **kwargs) -> Union[str, List[str]]\n |      execute a samtools command.\n |\n |      Keyword arguments:\n |      catch_stdout -- redirect stdout from the samtools command and\n |          return as variable (default True)\n |      save_stdout -- redirect stdout to a filename.\n |      raw -- ignore any parsers associated with this samtools command.\n |      split_lines -- return stdout (if catch_stdout is True and stderr\n |                     as a list of strings.\n |\n |  __init__(se"
+    },
+    {
+      "turn": 13,
+      "tool": "run_command",
+      "args": {
+        "command": "python3 -c \"import pysam; print(pysam.index.usage())\" 2>&1"
+      },
+      "output": "[exit 0]\nUsage: samtools index -M [-bc] [-m INT] <in1.bam> <in2.bam>...\n   or: samtools index [-bc] [-m INT] <in.bam> [out.index]\nOptions:\n  -b, --bai            Generate BAI-format index for BAM files [default]\n  -c, --csi            Generate CSI-format index for BAM files\n  -m, --min-shift INT  Set minimum interval size for CSI indices to 2^INT [14]\n  -M                   Interpret all filename arguments as files to be indexed\n  -o, --output FILE    Write index to FILE [alternative to <out.index> in args]\n  -@, --threads INT    Sets the number of threads [none]\n\n"
+    },
+    {
+      "turn": 14,
+      "tool": "run_command",
+      "args": {
+        "command": "python3 -c \"\nimport pysam\n# Check the input file\nf = pysam.AlignmentFile('/tmp/coding_bench_t1-mapq_p3xjim8r/input.bam', 'rb')\nprint('Header:', f.header)\nprint('References:', f.references)\nprint('First 3 reads:')\nfor i, read in enumerate(f):\n    if i >= 3:\n        break\n    print(f'  {read.query_name}: MAPQ={read.mapping_quality}, tid={read.tid}, pos={read.pos}')\nf.close()\n\""
+      },
+      "output": "[exit 0]\nHeader: @HD\tVN:1.6\tSO:unsorted\n@SQ\tSN:chr1\tLN:1000000\n@SQ\tSN:chr2\tLN:1000000\n@SQ\tSN:chr3\tLN:1000000\n\nReferences: ('chr1', 'chr2', 'chr3')\nFirst 3 reads:\n  read_0000: MAPQ=5, tid=2, pos=116739\n  read_0001: MAPQ=10, tid=1, pos=256787\n  read_0002: MAPQ=60, tid=2, pos=107473\n"
+    },
+    {
+      "turn": 15,
+      "tool": "write_file",
+      "args": {
+        "path": "/tmp/coding_bench_t1-mapq_p3xjim8r/solution.py",
+        "content": "#!/usr/bin/env python3\n\"\"\"\nBAM filtering solution:\n- Read input.bam\n- Filter reads with MAPQ >= 30\n- Write coordinate-sorted output to output.bam\n- Create the .bai index\n\"\"\"\n\nimport pysam\n\n\ndef main():\n    input_path = \"/tmp/coding_bench_t1-mapq_p3xjim8r/input.bam\"\n    output_path = \"/tmp/coding_bench_t1-mapq_p3xjim8r/output.bam\"\n    index_path = \"/tmp/coding_bench_t1-mapq_p3xjim8r/output.bam.bai\"\n\n    # Open input BAM for reading (with index if available)\n    with pysam.AlignmentFile(input_path, \"rb\") as infile:\n        # Collect all reads that pass the MAPQ >= 30 filter\n        filtered_reads = []\n        for read in infile:\n            if read.mapping_quality >= 30:\n                filtered_reads.append(read)\n\n        print(f\"Total reads after MAPQ >= 30 filter: {len(filtered_reads)}\")\n\n        # Sort by (reference_id, position) for coordinate-sorted output\n        # key: (tid, pos)\n        filtered_reads.sort(key=lambda r: (r.tid, r.pos))\n\n        # Open output BAM for writing\n        # Use template=infile to copy the header\n        with pysam.AlignmentFile(output_path, \"wb\", template=infile) as outfile:\n            for read in filtered_reads:\n                outfile.write(read)\n\n    print(f\"Written {len(filtered_reads)} reads to {output_path}\")\n\n    # Create the BAI index using samtools index command via pysam\n    import pysam\n    pysam.index(output_path)\n\n    print(f\"Created index at {index_path}\")\n\n    # Verify the output\n    print(\"\\n--- Verification ---\")\n    with pysam.AlignmentFile(output_path, \"rb\") as verify_file:\n        # Check header SO tag\n        header_dict = dict(verify_file.header)\n        print(f\"Output header: {header_dict}\")\n        \n        # Count total reads\n        total = sum(1 for _ in verify_file)\n        print(f\"Total reads in output BAM: {total}\")\n        \n        # Verify all reads have MAPQ >= 30\n        verify_file.seek(0)\n        min_mapq = float('inf')\n        for read in verify_file:\n            if read.mapping_quality < min_mapq:\n                min_mapq = read.mapping_quality\n        print(f\"Minimum MAPQ in output: {min_mapq} (should be >= 30)\")\n\n    # Verify index file exists\n    import os\n    if os.path.exists(index_path):\n        print(f\"Index file exists: {index_path}\")\n    else:\n        print(f\"ERROR: Index file NOT found at {index_path}\")\n\n\nif __name__ == \"__main__\":\n    main()"
+      },
+      "output": "wrote 2365 bytes to solution.py"
+    },
+    {
+      "turn": 16,
+      "tool": "run_command",
+      "args": {
+        "command": "cd /tmp/coding_bench_t1-mapq_p3xjim8r && python3 solution.py"
+      },
+      "output": "[exit 1]\nTraceback (most recent call last):\n  File \"/tmp/coding_bench_t1-mapq_p3xjim8r/solution.py\", line 74, in <module>\n    main()\n  File \"/tmp/coding_bench_t1-mapq_p3xjim8r/solution.py\", line 19, in main\n    with pysam.AlignmentFile(input_path, \"rb\") as infile:\n         ^^^^^\nUnboundLocalError: cannot access local variable 'pysam' where it is not associated with a value\n"
+    },
+    {
+      "turn": 17,
+      "tool": "write_file",
+      "args": {
+        "path": "/tmp/coding_bench_t1-mapq_p3xjim8r/solution.py",
+        "content": "#!/usr/bin/env python3\n\"\"\"\nBAM filtering solution:\n- Read input.bam\n- Filter reads with MAPQ >= 30\n- Write coordinate-sorted output to output.bam\n- Create the .bai index\n\"\"\"\n\nimport pysam\n\n\ndef main():\n    input_path = \"/tmp/coding_bench_t1-mapq_p3xjim8r/input.bam\"\n    output_path = \"/tmp/coding_bench_t1-mapq_p3xjim8r/output.bam\"\n    index_path = \"/tmp/coding_bench_t1-mapq_p3xjim8r/output.bam.bai\"\n\n    # Open input BAM for reading (with index if available)\n    with pysam.AlignmentFile(input_path, \"rb\") as infile:\n        # Collect all reads that pass the MAPQ >= 30 filter\n        filtered_reads = []\n        for read in infile:\n            if read.mapping_quality >= 30:\n                filtered_reads.append(read)\n\n        print(f\"Total reads after MAPQ >= 30 filter: {len(filtered_reads)}\")\n\n        # Sort by (reference_id, position) for coordinate-sorted output\n        # key: (tid, pos)\n        filtered_reads.sort(key=lambda r: (r.tid, r.pos))\n\n        # Open output BAM for writing\n        # Use template=infile to copy the header\n        with pysam.AlignmentFile(output_path, \"wb\", template=infile) as outfile:\n            for read in filtered_reads:\n                outfile.write(read)\n\n    print(f\"Written {len(filtered_reads)} reads to {output_path}\")\n\n    # Create the BAI index using samtools index command via pysam\n    pysam.index(output_path)\n\n    print(f\"Created index at {index_path}\")\n\n    # Verify the output\n    print(\"\\n--- Verification ---\")\n    with pysam.AlignmentFile(output_path, \"rb\") as verify_file:\n        # Check header SO tag\n        header_dict = dict(verify_file.header)\n        print(f\"Output header: {header_dict}\")\n        \n        # Count total reads\n        total = sum(1 for _ in verify_file)\n        print(f\"Total reads in output BAM: {total}\")\n        \n        # Verify all reads have MAPQ >= 30\n        verify_file.seek(0)\n        min_mapq = float('inf')\n        for read in verify_file:\n            if read.mapping_quality < min_mapq:\n                min_mapq = read.mapping_quality\n        print(f\"Minimum MAPQ in output: {min_mapq} (should be >= 30)\")\n\n    # Verify index file exists\n    import os\n    if os.path.exists(index_path):\n        print(f\"Index file exists: {index_path}\")\n    else:\n        print(f\"ERROR: Index file NOT found at {index_path}\")\n\n\nif __name__ == \"__main__\":\n    main()"
+      },
+      "output": "wrote 2348 bytes to solution.py"
+    },
+    {
+      "turn": 18,
+      "tool": "run_command",
+      "args": {
+        "command": "cd /tmp/coding_bench_t1-mapq_p3xjim8r && python3 solution.py"
+      },
+      "output": "[exit 1]\nTotal reads after MAPQ >= 30 filter: 50\nWritten 50 reads to /tmp/coding_bench_t1-mapq_p3xjim8r/output.bam\nCreated index at /tmp/coding_bench_t1-mapq_p3xjim8r/output.bam.bai\n\n--- Verification ---\nOutput header: {'HD': {'VN': '1.6', 'SO': 'unsorted'}, 'SQ': [{'SN': 'chr1', 'LN': 1000000}, {'SN': 'chr2', 'LN': 1000000}, {'SN': 'chr3', 'LN': 1000000}]}\nTotal reads in output BAM: 50\nTraceback (most recent call last):\n  File \"/tmp/coding_bench_t1-mapq_p3xjim8r/solution.py\", line 73, in <module>\n    main()\n  File \"/tmp/coding_bench_t1-mapq_p3xjim8r/solution.py\", line 59, in main\n    for read in verify_file:\n  File \"pysam/libcalignmentfile.pyx\", line 1877, in pysam.libcalignmentfile.AlignmentFile.__next__\nOSError: error -4 while reading file\n"
+    },
+    {
+      "turn": 19,
+      "tool": "run_command",
+      "args": {
+        "command": "ls -la /tmp/coding_bench_t1-mapq_p3xjim8r/output.bam /tmp/coding_bench_t1-mapq_p3xjim8r/output.bam.bai 2>&1"
+      },
+      "output": "[exit 0]\n-rw-rw-r-- 1 llm llm  853 Apr 25 13:37 /tmp/coding_bench_t1-mapq_p3xjim8r/output.bam\n-rw-rw-r-- 1 llm llm 2496 Apr 25 13:37 /tmp/coding_bench_t1-mapq_p3xjim8r/output.bam.bai\n"
+    },
+    {
+      "turn": 20,
+      "tool": "run_command",
+      "args": {
+        "command": "python3 -c \"\nimport pysam\nf = pysam.AlignmentFile('/tmp/coding_bench_t1-mapq_p3xjim8r/output.bam', 'rb')\nprint('Count:', sum(1 for _ in f))\nf.close()\n\""
+      },
+      "output": "[exit 0]\nCount: 50\n"
+    }
+  ],
+  "model_response_texts": [
+    "\n\nI'll complete this BAM filtering task step by step. Let me first understand the pysam API and then write the solution.\n\n## Plan\n\n1. Check the pysam API to understand the correct method names for reading/writing BAM files\n2. Write a Python script that:\n   - Opens the input BAM file\n   - Filters reads with MAPQ >= 30\n   - Writes to output BAM (which will be coordinate-sorted)\n   - Creates the index file\n3. Run the solution and verify the output\n\nLet me first check the pysam API:\n",
+    "\n\nNow let me check the input file and write the solution:\n\n",
+    "\n\nThe input is **unsorted** (SO:unsorted in header). I need to sort the output. Let me write the solution:\n",
+    "\n\nI have a variable shadowing issue. Let me fix the solution:\n",
+    "\n\nThere's an I/O error. Let me check the output file:\n\n"
+  ],
+  "voluntary_termination": false,
+  "malformed_args": 0,
+  "start_time": "2026-04-25 13:36:10",
+  "scoring": {
+    "api_correctness": {
+      "total_pysam_refs": 4,
+      "real_count": 4,
+      "fake_count": 0,
+      "fake_refs": [],
+      "score": 1.0
+    },
+    "functional": {
+      "score": 1.0,
+      "match": true,
+      "model_count": 50,
+      "gold_count": 50
+    },
+    "plan": {
+      "plan_count": 7,
+      "plan_items": [
+        "Check the pysam API to understand the correct method names for reading/writing BAM files",
+        "Write a Python script that:",
+        "Opens the input BAM file",
+        "Filters reads with MAPQ >= 30",
+        "Writes to output BAM (which will be coordinate-sorted)",
+        "Creates the index file",
+        "Run the solution and verify the output"
+      ],
+      "score": 1.0
+    },
+    "required_files": {
+      "required": [
+        "output.bam",
+        "output.bam.bai"
+      ],
+      "missing": [],
+      "score": 1.0
+    }
+  },
+  "end_time": "2026-04-25 13:37:44"
+}
