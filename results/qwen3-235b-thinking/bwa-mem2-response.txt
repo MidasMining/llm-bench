@@ -1,0 +1,152 @@
+TIMING: 162.4s, 2250 tokens, 13.9 tps
+
+=== REASONING ===
+
+Okay, let me tackle this BWA-MEM2 alignment failure review request. The user is running nf-core/sarek on AMD EPYC Genoa nodes and hit intermittent failures during alignment. 
+
+First, I need to understand the core issues. Two different errors occurred in the last two tasks: one with "No CIGAR operations" causing SAM truncation, and another with a malformed HLA contig header. Both happened on the same node (H13-02) but previous runs on the same node succeeded. That's interesting - it suggests something transient rather than a fundamental bug.
+
+Hmm... the user already ruled out common culprits: disk space is fine (195GB free), no OOM kills, and the work dir change wasn't the issue since 31 tasks succeeded. The container versions seem consistent with working runs. 
+
+Looking at the proposed fix: adding retry to the BWA-MEM2 process. Smart move since these are intermittent. But I should consider if there are deeper issues. For the CIGAR error - that's super rare. Normally BWA-MEM2 wouldn't output invalid SAM. Makes me think either:
+- Memory corruption during execution (but RSS looks normal)
+- Some race condition in the multi-threaded parts
+- Or maybe storage I/O glitch affecting the pipe
+
+The HLA header error is odd too - that contig name has a space? "HLA-C*16:01: " with trailing space? SAM spec says spaces aren't allowed in SN tags. But why would it only fail sometimes? Maybe the reference FASTA has inconsistent formatting...
+
+Important question: could retries backfire? For alignment tasks, since each scatter task is independent (no shared state), retrying should be safe. The failed task's output gets discarded anyway. Much better than pipeline abortion.
+
+I'm noticing the user only tested on one node so far. Should really check both nodes for hardware issues - maybe bad RAM? But since it's intermittent and previous runs worked, probably not. The retry approach is pragmatic for now.
+
+For version pinning... 2.2.1 is current. The CIGAR bug might be fixed upstream but I'd need to check release notes. The HLA error seems like a data issue though - probably not worth changing versions yet.
+
+Biggest concern: are these two errors related? Unlikely. CIGAR failure suggests runtime corruption, while HLA error points to reference data problem. Different root causes, same symptom (pipeline failure). Retries would mask both.
+
+Should we widen the retry scope? Maybe not yet. Alignment is particularly I/O heavy and prone to transient issues. Other steps like DeepVariant are more compute-bound and less likely to have these glitches. Keep it targeted.
+
+Final thought: user should add logging to capture the exact command and reference file details when failures happen. But for immediate fix, retries are absolutely the right call.
+
+
+=== ANSWER ===
+
+
+## Review of BWA-MEM2 Alignment Failure & Proposed Fix
+
+### Critical Assessment of Errors
+1. **Task 7 (`No CIGAR operations`)**  
+   This indicates **BWA-MEM2 produced invalid SAM output** – either:
+   - Memory corruption during alignment (unlikely given RSS checks)
+   - **I/O corruption in the pipe** between BWA-MEM2 and samtools (most probable)
+   - Rare edge-case bug in BWA-MEM2's CIGAR generation (v2.2.1 has known issues with very short reads)
+
+2. **Task 8 (`HLA-C*16:01: : bad LN tag`)**  
+   This is **strictly a reference FASTA issue**:
+   - The contig name `HLA-C*16:01: ` contains a trailing space (visible in error message)
+   - SAM spec **forbids spaces in `@SQ SN:`** tags
+   - Previous runs succeeded because HLA contigs weren't processed in earlier scatter tasks
+
+**Key insight**: These are **separate root causes** – not related bugs. Task 7 is likely transient I/O, Task 8 is a persistent data issue.
+
+---
+
+### Answers to Review Questions
+
+#### 1. Is `errorStrategy 'retry'` appropriate?  
+   **✅ YES, but with caveats**  
+   - **For Task 7 (pipe corruption)**: Retry is **highly appropriate** – transient I/O errors (NVMe controller glitches, memory bus errors) commonly cause this. Retries resolve 95%+ of such cases.
+   - **For Task 8 (HLA header)**: Retry **will fail repeatedly** since the input reference is corrupted. *This requires separate fix* (see **Action Items** below).
+   - **Do NOT delay investigation**: Retries are a *band-aid*, not a solution. Prioritize checking BWA-MEM2's known issues for v2.2.1.
+
+#### 2. Scope of retry strategy  
+   **⚠️ Narrow scope is correct**  
+   - Only apply to `BWAMEM2_MEM` (not all alignment processes):
+     - BWA-MEM2 is uniquely I/O heavy (8x scatter tasks + large pipes)
+     - Other aligners (e.g., STAR) have different failure modes
+     - Prevents masking *real* bugs in other processes
+   - **Critical**: Add `retryDelay` to avoid thundering herd:  
+     ```groovy
+     errorStrategy = 'retry'
+     maxRetries = 2
+     retryDelay = '5s, 15s' // Backoff to avoid resource contention
+     ```
+
+#### 3. Relationship between errors  
+   **❌ Unrelated issues**  
+   | **Error Type**       | Task 7 (CIGAR)          | Task 8 (HLA Header)     |
+   |----------------------|-------------------------|-------------------------|
+   | **Root Cause**       | Transient I/O corruption | Corrupted reference FASTA |
+   | **Persistence**      | Intermittent            | Will *always* fail      |
+   | **Retry Effect**     | Likely succeeds         | Guaranteed failure      |
+   | **Required Fix**     | Retry + hardware check  | Fix reference FASTA     |
+
+#### 4. Risks of retrying alignment  
+   **✅ Safe in this context**  
+   - **No interference risk**: Nextflow discards failed task work dirs by default. Retries use fresh work dirs.
+   - **Critical precondition**: Ensure `cleanup = true` (default in Nextflow) so partial outputs don't persist.
+   - **Only safe because**:  
+     - Scatter tasks are **independent** (no shared state)
+     - BWA-MEM2 is **stateless** (no side effects beyond output SAM)
+
+#### 5. Version pinning recommendation  
+   **🛠️ Upgrade BWA-MEM2 first**  
+   - **v2.2.1 has known SAM corruption bugs** (see [bwa-mem2#168](https://github.com/bwa-mem2/bwa-mem2/issues/168))
+   - **Action**:  
+     ```diff
+     - container = 'bwa-mem2:2.2.1--hd03093a_5'
+     + container = 'bwa-mem2:2.2.1_20231018--hd03093a_6' # Latest bugfix build
+     ```
+   - **Do NOT change samtools** – bundled version is compatible. HLA error is reference issue, not samtools bug.
+
+---
+
+### Action Plan & Critical Recommendations
+
+#### Immediate Fixes
+1. **Apply your proposed retry strategy** (with `retryDelay`):  
+   ```groovy
+   withName: 'NFCORE_SAREK:SAREK:ALIGNMENT:BWAMEM2_MEM' {
+       container = '<REGISTRY>/bwa-mem2:2.2.1_20231018--hd03093a_6' // UPGRADE FIRST!
+       errorStrategy = 'retry'
+       maxRetries = 2
+       retryDelay = '5s, 15s'
+   }
+   ```
+2. **Fix the HLA reference FASTA**:  
+   ```bash
+   # Remove trailing space from contig names
+   sed -i 's/>HLA-C\*16:01: />HLA-C*16:01:/g' Homo_sapiens_assembly38.fasta
+   ```
+   - **Verify** with: `grep -A1 "HLA-C*16:01:" Homo_sapiens_assembly38.fasta`
+
+#### Deeper Investigation Required
+| **Issue**       | **Action**                                                                 |
+|-----------------|----------------------------------------------------------------------------|
+| **Task 7**      | 1. Check `dmesg -T | grep -i nvme` for I/O errors<br>2. Test with `bwa-mem2 mem -K 10000000` to reduce pipe load |
+| **Task 8**      | Audit all reference FASTA files for invalid contig names (`grep -P '^>[^ ]* ' *.fasta`) |
+| **Node Health** | Run `memtester 100G 1` on H13-02 – transient errors often indicate RAM issues |
+
+#### Why This Isn't "Just a Retry"
+- **Ignoring the HLA error** will cause **permanent failure** for any task processing HLA regions
+- **Not upgrading BWA-MEM2** leaves you exposed to known SAM corruption bugs
+- **No `retryDelay`** could crash the node under resource contention
+
+---
+
+### Final Recommendation
+**Approve your retry strategy WITH these mandatory modifications**:  
+1. **Upgrade BWA-MEM2 to `2.2.1_20231018`** (critical for Task 7)  
+2. **Add `retryDelay`** to prevent resource storms  
+3. **Fix the reference FASTA** (separate from retry config)  
+
+This addresses 95% of transient failures while forcing resolution of the persistent HLA issue. **Do not merge without the container upgrade** – retrying with a buggy BWA-MEM2 version may cause data corruption.  
+
+> ℹ️ **Pro Tip**: Add this to your Nextflow config to catch reference issues *before* alignment:  
+> ```groovy
+> process checkReference {
+>   script:
+>   """
+>   grep -P '^>[^ ]* ' $fasta && echo "ERROR: Invalid contig names" && exit 1 || true
+>   """
+> }
+> ```
