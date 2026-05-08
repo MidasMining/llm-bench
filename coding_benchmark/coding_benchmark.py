@@ -209,10 +209,15 @@ def main():
         for turn in range(args.max_turns):
             log["turns"] = turn + 1
             print(f"--- Turn {turn + 1} ---")
+            # Force submit_plan until one has been submitted. After that, free choice.
+            # This makes the bench universal across models — the "plan first" constraint
+            # lives at the protocol level, not the prompt level.
+            tool_choice = ({"type": "function", "function": {"name": "submit_plan"}}
+                           if not plan_submitted else "auto")
             try:
                 resp = requests.post(args.api_url, json={
                     "model": args.model, "messages": messages, "tools": TOOLS,
-                    "tool_choice": "auto",
+                    "tool_choice": tool_choice,
                     "temperature": args.temperature, "top_p": args.top_p,
                     "max_tokens": args.max_tokens,
                 }, timeout=args.request_timeout)

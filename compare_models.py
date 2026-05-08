@@ -71,7 +71,7 @@ DEFAULT_CONFIG = {
     },
     "settings": {
         "temperature": 0.0,
-        "max_tokens": 2048,  # Reduced for V100 speed (~4.7 tok/s)
+        "max_tokens": 6144,  # Increased for v0.20+ reasoning models (think tokens eat budget)
         "timeout": 600,
     }
 }
@@ -1138,7 +1138,14 @@ def call_model(api_url: str, model_id: str, prompt: str,
         if debug:
             print(f"  [DEBUG] Status: {response.status_code}")
         data = response.json()
-        content = data['choices'][0]['message']['content']
+        msg = data['choices'][0]['message']
+        content = msg.get('content') or ''
+        # vLLM v0.20+ separates thinking into 'reasoning' field
+        reasoning = msg.get('reasoning') or msg.get('reasoning_content') or ''
+        if reasoning and not content:
+            content = reasoning
+        elif reasoning:
+            content = reasoning + '\n' + content
         tokens = data.get('usage', {}).get('total_tokens', 0)
         elapsed = time.time() - start_time
 
