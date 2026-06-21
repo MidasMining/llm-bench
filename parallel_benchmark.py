@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 import statistics
 
-VERSION = "1.0"
+VERSION = "2.0"
 
 # ============================================================================
 # COLORS
@@ -155,8 +155,11 @@ Provide the complete script.""",
 class RequestResult:
     prompt_name: str
     success: bool
-    tokens: int
+    tokens: int  # completion tokens only (output)
     latency: float  # seconds
+    prompt_tokens: int = 0
+    total_tokens: int = 0  # prompt + completion (for reference)
+    ttft: float = 0.0  # time to first token (prefill latency)
     error: Optional[str] = None
 
 @dataclass
@@ -165,13 +168,15 @@ class ConcurrencyResult:
     total_requests: int
     successful: int
     failed: int
-    total_tokens: int
+    total_tokens: int  # completion tokens (output only)
     total_time: float
-    aggregate_throughput: float  # tok/s
+    aggregate_throughput: float  # tok/s (completion tokens / wall time)
     avg_latency: float
     p50_latency: float
     p95_latency: float
     per_request_throughput: float  # tok/s per request
+    avg_ttft: float = 0.0  # average time to first token across requests
+    p50_ttft: float = 0.0
 
 @dataclass
 class BenchmarkResult:
@@ -196,8 +201,14 @@ async def call_model_async(
     max_tokens: int,
     timeout: int = 300
 ) -> RequestResult:
-    """Make async API call to model."""
+    """Make async streaming API call to model.
+
+    Uses SSE streaming to measure TTFT (time to first token) and properly
+    separates prompt_tokens from completion_tokens. Throughput is based on
+    completion tokens only (output generation), not inflated by prompt size.
+    """
     start_time = time.time()
+    ttft = 0.0
 
     try:
         async with session.post(
@@ -207,29 +218,61 @@ async def call_model_async(
                 'messages': [{'role': 'user', 'content': prompt}],
                 'max_tokens': max_tokens,
                 'temperature': 0.0,
+                'stream': True,
+                'stream_options': {'include_usage': True},
             },
-            timeout=aiohttp.ClientTimeout(total=timeout)
+            timeout=aiohttp.ClientTimeout(total=timeout),
+            headers={"Accept": "text/event-stream"},
         ) as response:
-            data = await response.json()
-
             if response.status != 200:
-                error = data.get('error', {}).get('message', f'HTTP {response.status}')
+                body = await response.text()
                 return RequestResult(
                     prompt_name="",
                     success=False,
                     tokens=0,
                     latency=time.time() - start_time,
-                    error=error
+                    error=f"HTTP {response.status}: {body[:200]}"
                 )
 
-            tokens = data.get('usage', {}).get('total_tokens', 0)
+            pt = ct = 0
+            first_token_seen = False
+
+            async for raw_line in response.content:
+                line = raw_line.decode('utf-8', errors='replace').strip()
+                if not line or not line.startswith("data: "):
+                    continue
+                payload_str = line[6:]
+                if payload_str == "[DONE]":
+                    break
+                try:
+                    ev = json.loads(payload_str)
+                except json.JSONDecodeError:
+                    continue
+                if ev.get("usage"):
+                    pt = ev["usage"].get("prompt_tokens", pt)
+                    ct = ev["usage"].get("completion_tokens", ct)
+                choices = ev.get("choices") or []
+                if choices and not first_token_seen:
+                    delta = choices[0].get("delta") or {}
+                    emitted = (delta.get("content")
+                               or delta.get("reasoning")
+                               or delta.get("reasoning_content"))
+                    if emitted:
+                        ttft = time.time() - start_time
+                        first_token_seen = True
+
             latency = time.time() - start_time
+            if not first_token_seen:
+                ttft = latency
 
             return RequestResult(
                 prompt_name="",
                 success=True,
-                tokens=tokens,
-                latency=latency
+                tokens=ct,  # completion tokens only
+                latency=latency,
+                prompt_tokens=pt,
+                total_tokens=pt + ct,
+                ttft=ttft,
             )
 
     except asyncio.TimeoutError:
@@ -288,13 +331,17 @@ async def run_concurrent_requests(
     successful = [r for r in results if r.success]
     failed = [r for r in results if not r.success]
 
+    # Use completion tokens only for throughput (not prompt tokens)
     total_tokens = sum(r.tokens for r in successful)
     latencies = [r.latency for r in successful] if successful else [0]
+    ttfts = [r.ttft for r in successful if r.ttft > 0]
 
     aggregate_throughput = total_tokens / total_time if total_time > 0 else 0
     avg_latency = statistics.mean(latencies) if latencies else 0
     p50_latency = statistics.median(latencies) if latencies else 0
     p95_latency = sorted(latencies)[int(len(latencies) * 0.95)] if len(latencies) > 1 else avg_latency
+    avg_ttft = statistics.mean(ttfts) if ttfts else 0
+    p50_ttft = statistics.median(ttfts) if ttfts else 0
 
     per_request_throughput = aggregate_throughput / concurrency if concurrency > 0 else 0
 
@@ -309,7 +356,9 @@ async def run_concurrent_requests(
         avg_latency=avg_latency,
         p50_latency=p50_latency,
         p95_latency=p95_latency,
-        per_request_throughput=per_request_throughput
+        per_request_throughput=per_request_throughput,
+        avg_ttft=avg_ttft,
+        p50_ttft=p50_ttft,
     )
 
 # ============================================================================
@@ -465,10 +514,12 @@ def main():
     print(f"\n{C.CYAN}Sequential Results:{C.RESET}")
     print(f"  Total requests: {seq_result.total_requests}")
     print(f"  Successful: {seq_result.successful}")
-    print(f"  Total tokens: {seq_result.total_tokens}")
+    print(f"  Completion tokens: {seq_result.total_tokens}")
     print(f"  Total time: {seq_result.total_time:.1f}s")
-    print(f"  {C.BOLD}Throughput: {seq_result.aggregate_throughput:.1f} tok/s{C.RESET}")
+    print(f"  {C.BOLD}Throughput: {seq_result.aggregate_throughput:.1f} tok/s (completion only){C.RESET}")
     print(f"  Avg latency: {seq_result.avg_latency:.1f}s")
+    if seq_result.avg_ttft > 0:
+        print(f"  Avg TTFT: {seq_result.avg_ttft:.2f}s")
 
     # ========================================================================
     # LEG 2: PARALLEL (Throughput Mode)
@@ -510,14 +561,15 @@ def main():
     print(f"  Avg Latency: {seq_result.avg_latency:.1f}s")
 
     print(f"\n{C.CYAN}Parallel Scaling:{C.RESET}")
-    print(f"  {'Conc':<6} {'Throughput':<12} {'Per-Req':<10} {'Latency':<10} {'Status'}")
-    print(f"  {'-'*50}")
+    print(f"  {'Conc':<6} {'Throughput':<12} {'Per-Req':<10} {'TTFT':<8} {'Latency':<10} {'Status'}")
+    print(f"  {'-'*60}")
 
     for r in parallel_results:
         status = f"{C.PASS}OK{C.RESET}" if r.failed == 0 else f"{C.YELLOW}{r.failed} failed{C.RESET}"
         marker = " ← peak" if r.concurrency == peak_result.concurrency else ""
+        ttft_str = f"{r.avg_ttft:.2f}s" if r.avg_ttft > 0 else "N/A"
         print(f"  {r.concurrency:<6} {r.aggregate_throughput:<12.1f} "
-              f"{r.per_request_throughput:<10.1f} {r.avg_latency:<10.1f} {status}{marker}")
+              f"{r.per_request_throughput:<10.1f} {ttft_str:<8} {r.avg_latency:<10.1f} {status}{marker}")
 
     print(f"\n{C.BOLD}Peak Performance:{C.RESET}")
     print(f"  Concurrency: {peak_result.concurrency}")
@@ -532,23 +584,32 @@ def main():
 
     results = {
         "version": VERSION,
+        "benchmark": "parallel",
         "model": args.model,
         "api_url": args.api_url,
         "timestamp": timestamp,
+        "notes": {
+            "throughput_metric": "completion_tokens_only",
+            "description": "Throughput based on output (completion) tokens / wall time. "
+                           "Prompt tokens excluded. TTFT measured via streaming.",
+        },
         "sequential": {
-            "throughput_toks": seq_result.aggregate_throughput,
-            "avg_latency_s": seq_result.avg_latency,
-            "total_tokens": seq_result.total_tokens,
-            "total_time_s": seq_result.total_time,
+            "throughput_toks": round(seq_result.aggregate_throughput, 2),
+            "avg_latency_s": round(seq_result.avg_latency, 3),
+            "avg_ttft_s": round(seq_result.avg_ttft, 4),
+            "completion_tokens": seq_result.total_tokens,
+            "total_time_s": round(seq_result.total_time, 3),
         },
         "parallel": [
             {
                 "concurrency": r.concurrency,
-                "throughput_toks": r.aggregate_throughput,
-                "per_request_toks": r.per_request_throughput,
-                "avg_latency_s": r.avg_latency,
-                "p50_latency_s": r.p50_latency,
-                "p95_latency_s": r.p95_latency,
+                "throughput_toks": round(r.aggregate_throughput, 2),
+                "per_request_toks": round(r.per_request_throughput, 2),
+                "avg_latency_s": round(r.avg_latency, 3),
+                "p50_latency_s": round(r.p50_latency, 3),
+                "p95_latency_s": round(r.p95_latency, 3),
+                "avg_ttft_s": round(r.avg_ttft, 4),
+                "p50_ttft_s": round(r.p50_ttft, 4),
                 "successful": r.successful,
                 "failed": r.failed,
             }
@@ -556,8 +617,10 @@ def main():
         ],
         "peak": {
             "concurrency": peak_result.concurrency,
-            "throughput_toks": peak_result.aggregate_throughput,
-            "speedup_vs_sequential": peak_result.aggregate_throughput / seq_result.aggregate_throughput,
+            "throughput_toks": round(peak_result.aggregate_throughput, 2),
+            "speedup_vs_sequential": round(
+                peak_result.aggregate_throughput / seq_result.aggregate_throughput, 2
+            ) if seq_result.aggregate_throughput > 0 else 0,
         }
     }
 

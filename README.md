@@ -251,23 +251,49 @@ python decode_rate_bench.py --model <model-id> --no-json
 
 | Tool | Purpose | Output |
 |------|---------|--------|
-| `compare_models.py` | "Is this model worth running?" | Quality score (22-check rubric) + ballpark throughput |
+| `compare_models.py` | "Is this model worth running?" | Quality score (22-check rubric) + per-test TTFT + throughput |
 | `decode_rate_bench.py` | "How fast is this kernel/config?" | JSON + table: per-context decode rate, TTFT (prefill), median/min/max stats, prefill scaling curve |
-| `parallel_benchmark.py` | Multi-stream peak throughput | Concurrency-scaling t/s curve |
+| `parallel_benchmark.py` | Multi-stream peak throughput | Concurrency-scaling curve with TTFT + completion-only t/s |
 | `long_context_test.py` | Functional test at long context | Pass/fail at target ctx |
+| `report.py` | Unified view of all results | Combined summary: quality + decode + concurrency |
 | `tool_call_benchmark/` | Multi-step SSH tool-call reliability | See subdir README |
 
 `decode_rate_bench.py` is the canonical "how fast does it decode?" tool — use it when comparing kernels, KV-quant settings, or autotune results. `compare_models.py` reports throughput as a side effect of quality testing, but its numbers are distorted by reasoning-token accounting on thinking models. For honest decode-rate comparisons, prefer `decode_rate_bench.py`.
 
+`report.py` combines results from all three tools into a single view:
+```bash
+# Auto-discover results for a model:
+python report.py --model seed-oss
+
+# Generate markdown:
+python report.py --model seed-oss --format markdown > MODEL_REPORT.md
+```
+
 For the multi-step SSH tool-call reliability bench, see `tool_call_benchmark/README.md`.
+
+### Metric definitions
+
+| Metric | Meaning | Where measured |
+|--------|---------|---------------|
+| **TTFT** | Time to first token (prefill latency) | All three tools (streaming) |
+| **Decode rate** | Tokens/sec after first token, isolated from prefill | `decode_rate_bench.py` |
+| **Throughput** | Completion tokens / wall time (prompt tokens excluded) | `parallel_benchmark.py` |
+| **Quality** | 22-check rubric on real debugging tasks | `compare_models.py` |
+
+**Important notes on throughput:**
+- All throughput numbers are based on **completion (output) tokens only** — prompt tokens are excluded
+- Reasoning models emit invisible `<think>` tokens that inflate raw throughput numbers
+- `decode_rate_bench.py` disables reasoning (`enable_thinking=False`) for honest kernel comparison
+- `compare_models.py` and `parallel_benchmark.py` measure total output including reasoning tokens
 
 ## File Structure
 
 ```
 llm-bench/
-├── compare_models.py              # main benchmark harness (v2.1) — quality scoring
-├── decode_rate_bench.py           # single-stream decode-rate bench, SSE-streaming, separates TTFT
-├── parallel_benchmark.py          # standalone throughput benchmark (concurrency-scaling)
+├── compare_models.py              # main benchmark harness (v2.1) — quality + per-test TTFT
+├── decode_rate_bench.py           # single-stream decode-rate bench (v2.0) — prefill vs decode isolated
+├── parallel_benchmark.py          # throughput benchmark (v2.0) — concurrency scaling + TTFT
+├── report.py                      # unified report generator — combines all three tools
 ├── long_context_test.py           # long-context functional test
 ├── models.yaml                    # model configurations
 ├── CONSOLIDATED-FINDINGS.md       # detailed analysis and findings (8x A4000 sweep)
