@@ -920,9 +920,9 @@ class ParallelResult:
     total_requests: int
     successful: int
     failed: int
-    total_tokens: int
+    total_tokens: int  # completion tokens only (output)
     total_time: float
-    aggregate_throughput: float
+    aggregate_throughput: float  # completion tokens / wall time
     per_request_throughput: float
     avg_latency: float
     p50_latency: float
@@ -937,7 +937,10 @@ async def call_model_async(
     max_tokens: int,
     timeout: int = 300
 ) -> Tuple[bool, int, float, Optional[str]]:
-    """Make async API call. Returns (success, tokens, latency, error)."""
+    """Make async API call. Returns (success, completion_tokens, latency, error).
+
+    Uses completion_tokens only for throughput calculation (not prompt+completion).
+    """
     start_time = time.time()
     try:
         async with session.post(
@@ -954,7 +957,11 @@ async def call_model_async(
             if response.status != 200:
                 error = data.get('error', {}).get('message', f'HTTP {response.status}')
                 return False, 0, time.time() - start_time, error
-            tokens = data.get('usage', {}).get('total_tokens', 0)
+            # Use completion_tokens for throughput (output only, not prompt)
+            tokens = data.get('usage', {}).get('completion_tokens', 0)
+            if tokens == 0:
+                # Fallback for servers that don't report completion_tokens separately
+                tokens = data.get('usage', {}).get('total_tokens', 0)
             return True, tokens, time.time() - start_time, None
     except asyncio.TimeoutError:
         return False, 0, time.time() - start_time, "Timeout"
