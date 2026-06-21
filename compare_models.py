@@ -1,24 +1,25 @@
 #!/usr/bin/env python3
 """
-Model Comparison Test Harness v2.0
-==================================
-Complete benchmark suite for comparing local LLM models.
+Model Comparison Test Harness v3.0 — Quality & Sequential Metadata
+==================================================================
+Evaluates model quality on practical debugging tests (22-check rubric)
+and records per-test TTFT and sequential throughput as metadata.
 
-Includes:
-- Standard benchmarks (46 tests): code, reasoning, knowledge, tool use, speed, context
-- Practical debugging tests: zmq, pplns, expert, nightmare, hiveos_wrapper
-- Long context test: multi-file codebase analysis
+For parallel throughput benchmarking, use parallel_benchmark.py.
+For isolated decode-rate measurement, use decode_rate_bench.py.
+For long-context functional tests, use long_context_test.py.
+For orchestrated runs combining all tools, use run_all.py.
 
 Usage:
     # Full comparison (sequential - one model at a time)
     python compare_models.py --config models.yaml
-    
+
     # Quick comparison (skip slow tests)
     python compare_models.py --config models.yaml --quick
-    
+
     # Run specific model only
     python compare_models.py --model seed-oss --api-url http://localhost:8000/v1
-    
+
     # Run specific test categories
     python compare_models.py --tests practical nightmare
 
@@ -27,14 +28,12 @@ Date: January 2026
 """
 
 import argparse
-import asyncio
 import json
 import os
 import re
 import subprocess
 import sys
 import time
-import statistics
 import yaml
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -42,14 +41,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple
 import requests
 
-# Async HTTP support for parallel tests
-try:
-    import aiohttp
-    ASYNC_AVAILABLE = True
-except ImportError:
-    ASYNC_AVAILABLE = False
-
-VERSION = "2.1"  # Added parallel benchmark support
+VERSION = "3.0"  # Quality-only; parallel/long-context moved to standalone tools
 
 # ============================================================================
 # CONFIGURATION
@@ -67,7 +59,6 @@ DEFAULT_CONFIG = {
     "tests": {
         "standard": True,
         "practical": True,
-        "long_context": True,
     },
     "settings": {
         "temperature": 0.0,
@@ -780,39 +771,6 @@ IMPORTANT CONVENTIONS:
 }
 
 # ============================================================================
-# LONG CONTEXT TEST
-# ============================================================================
-
-LONG_CONTEXT_TEST = {
-    "name": "Multi-File Codebase Analysis",
-    "description": "Tests ability to understand relationships across multiple files",
-    "questions": [
-        {
-            "prompt": """Given a mining pool codebase with the following files:
-- thought_pool.py (stratum server, block submission)
-- block_manager.py (pending block tracking, confirmations)
-- pplns.py (payout calculations)
-- web_server.py (dashboard API)
-
-Question: Trace the flow from when a miner finds a block to when payouts are calculated. 
-Which methods are called in which order across these files?""",
-            "key_points": ["_handle_submit", "block_manager", "add_pending", "confirm", "calculate_payouts"],
-        },
-        {
-            "prompt": """In a cryptocurrency mining pool, block hashes need careful byte order handling.
-The node returns hashes in RPC format (big-endian hex), but block headers use little-endian.
-
-Question: If you see this code:
-```python
-prev_hash = bytes.fromhex(template['previousblockhash'])
-```
-What bug might this cause and how would you fix it?""",
-            "key_points": ["reverse", r"\[::-1\]", "little-endian", "byte order", "endian"],
-        },
-    ]
-}
-
-# ============================================================================
 # TEST RUNNER
 # ============================================================================
 
@@ -835,11 +793,9 @@ class ModelResults:
     timestamp: str
     standard_score: float = 0.0
     practical_score: float = 0.0
-    long_context_score: float = 0.0
     overall_score: float = 0.0
     throughput: float = 0.0
     tests: List[TestResult] = field(default_factory=list)
-    parallel_results: Dict[str, Any] = field(default_factory=dict)
     gpu_info: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -909,218 +865,6 @@ def run_warmup(api_url: str, model_id: str, timeout: int = 60) -> bool:
         print(f"{C.FAIL}Failed ({e}){C.RESET}")
         return False
 
-
-# ============================================================================
-# PARALLEL BENCHMARK (Async)
-# ============================================================================
-
-@dataclass
-class ParallelResult:
-    concurrency: int
-    total_requests: int
-    successful: int
-    failed: int
-    total_tokens: int  # completion tokens only (output)
-    total_time: float
-    aggregate_throughput: float  # completion tokens / wall time
-    per_request_throughput: float
-    avg_latency: float
-    p50_latency: float
-    p95_latency: float
-
-
-async def call_model_async(
-    session: 'aiohttp.ClientSession',
-    api_url: str,
-    model_id: str,
-    prompt: str,
-    max_tokens: int,
-    timeout: int = 300
-) -> Tuple[bool, int, float, Optional[str]]:
-    """Make async API call. Returns (success, completion_tokens, latency, error).
-
-    Uses completion_tokens only for throughput calculation (not prompt+completion).
-    """
-    start_time = time.time()
-    try:
-        async with session.post(
-            f"{api_url}/chat/completions",
-            json={
-                'model': model_id,
-                'messages': [{'role': 'user', 'content': prompt}],
-                'max_tokens': max_tokens,
-                'temperature': 0.0,
-            },
-            timeout=aiohttp.ClientTimeout(total=timeout)
-        ) as response:
-            data = await response.json()
-            if response.status != 200:
-                error = data.get('error', {}).get('message', f'HTTP {response.status}')
-                return False, 0, time.time() - start_time, error
-            # Use completion_tokens for throughput (output only, not prompt)
-            tokens = data.get('usage', {}).get('completion_tokens', 0)
-            if tokens == 0:
-                # Fallback for servers that don't report completion_tokens separately
-                tokens = data.get('usage', {}).get('total_tokens', 0)
-            return True, tokens, time.time() - start_time, None
-    except asyncio.TimeoutError:
-        return False, 0, time.time() - start_time, "Timeout"
-    except Exception as e:
-        return False, 0, time.time() - start_time, str(e)
-
-
-async def run_parallel_requests(
-    api_url: str,
-    model_id: str,
-    prompts: List[Dict],
-    concurrency: int,
-    max_tokens: int = 512,
-    timeout: int = 300
-) -> ParallelResult:
-    """Run multiple requests concurrently."""
-    # Build request list - cycle through prompts to reach concurrency
-    requests_list = []
-    for i in range(concurrency):
-        p = prompts[i % len(prompts)]
-        requests_list.append({'prompt': p['prompt'], 'max_tokens': max_tokens})
-
-    connector = aiohttp.TCPConnector(limit=concurrency + 10)
-    async with aiohttp.ClientSession(connector=connector) as session:
-        start_time = time.time()
-        tasks = [
-            call_model_async(session, api_url, model_id, r['prompt'], r['max_tokens'], timeout)
-            for r in requests_list
-        ]
-        results = await asyncio.gather(*tasks)
-        total_time = time.time() - start_time
-
-    # Analyze results
-    successful = [(tokens, latency) for success, tokens, latency, _ in results if success]
-    failed = [(err,) for success, _, _, err in results if not success]
-
-    total_tokens = sum(t for t, _ in successful)
-    latencies = [l for _, l in successful] if successful else [0]
-
-    aggregate_tps = total_tokens / total_time if total_time > 0 else 0
-
-    return ParallelResult(
-        concurrency=concurrency,
-        total_requests=len(results),
-        successful=len(successful),
-        failed=len(failed),
-        total_tokens=total_tokens,
-        total_time=total_time,
-        aggregate_throughput=aggregate_tps,
-        per_request_throughput=aggregate_tps / concurrency if concurrency > 0 else 0,
-        avg_latency=statistics.mean(latencies) if latencies else 0,
-        p50_latency=statistics.median(latencies) if latencies else 0,
-        p95_latency=sorted(latencies)[int(len(latencies) * 0.95)] if len(latencies) > 1 else latencies[0] if latencies else 0,
-    )
-
-
-def run_parallel_benchmark(
-    api_url: str,
-    model_id: str,
-    tests_to_run: List[str],
-    max_concurrent: int = 32,
-    max_tokens: int = 512,
-    timeout: int = 300
-) -> Dict[str, Any]:
-    """Run the parallel benchmark leg using real practical test prompts."""
-
-    if not ASYNC_AVAILABLE:
-        print(f"{C.FAIL}aiohttp not installed. Run: pip install aiohttp{C.RESET}")
-        return {}
-
-    # Build prompts from real practical tests
-    prompts = []
-    for test_key in tests_to_run:
-        if test_key in PRACTICAL_TESTS:
-            prompts.append({
-                'name': PRACTICAL_TESTS[test_key]['name'],
-                'prompt': PRACTICAL_TESTS[test_key]['prompt'],
-            })
-
-    if not prompts:
-        print(f"{C.FAIL}No valid prompts for parallel test{C.RESET}")
-        return {}
-
-    print(f"\n{C.CYAN}Auto-detecting optimal concurrency...{C.RESET}")
-
-    # Test increasing concurrency levels
-    test_levels = [1, 2, 4, 8, 16, 32, 64]
-    test_levels = [c for c in test_levels if c <= max_concurrent]
-
-    detection_results = []
-    optimal_conc = 1
-    peak_throughput = 0
-
-    for conc in test_levels:
-        print(f"  Testing concurrency={conc}...", end=" ", flush=True)
-        result = asyncio.run(run_parallel_requests(
-            api_url, model_id, prompts, conc, max_tokens=256, timeout=120
-        ))
-        detection_results.append(result)
-        print(f"{result.aggregate_throughput:.1f} tok/s")
-
-        if result.aggregate_throughput > peak_throughput:
-            peak_throughput = result.aggregate_throughput
-            optimal_conc = conc
-
-        # Stop if throughput declining significantly or too many failures
-        if len(detection_results) > 2:
-            if result.aggregate_throughput < detection_results[-2].aggregate_throughput * 0.85:
-                break
-        if result.failed > result.successful:
-            print(f"  {C.YELLOW}Too many failures, stopping detection{C.RESET}")
-            break
-
-    print(f"\n{C.PASS}Optimal concurrency: {optimal_conc} ({peak_throughput:.1f} tok/s){C.RESET}")
-
-    # Now run full benchmark at selected concurrency levels
-    concurrency_levels = [1, 2, 4, 8, 16, 32]
-    concurrency_levels = [c for c in concurrency_levels if c <= max_concurrent]
-    if optimal_conc not in concurrency_levels:
-        concurrency_levels.append(optimal_conc)
-        concurrency_levels.sort()
-
-    print(f"\n{C.CYAN}Running full parallel benchmark...{C.RESET}")
-    print(f"  Concurrency levels: {concurrency_levels}")
-    print(f"  Prompts: {len(prompts)} practical tests")
-
-    parallel_results = []
-    for conc in concurrency_levels:
-        print(f"  Concurrency {conc}...", end=" ", flush=True)
-        result = asyncio.run(run_parallel_requests(
-            api_url, model_id, prompts, conc, max_tokens=max_tokens, timeout=timeout
-        ))
-        parallel_results.append(result)
-
-        status = C.PASS if result.failed == 0 else C.YELLOW
-        marker = " <- peak" if conc == optimal_conc else ""
-        print(f"{status}{result.aggregate_throughput:.1f} tok/s "
-              f"({result.successful}/{result.total_requests} ok){C.RESET}{marker}")
-
-    # Find peak from full benchmark
-    peak_result = max(parallel_results, key=lambda r: r.aggregate_throughput)
-
-    return {
-        'optimal_concurrency': optimal_conc,
-        'peak_throughput': peak_result.aggregate_throughput,
-        'results': [
-            {
-                'concurrency': r.concurrency,
-                'throughput': r.aggregate_throughput,
-                'per_request': r.per_request_throughput,
-                'avg_latency': r.avg_latency,
-                'p50_latency': r.p50_latency,
-                'p95_latency': r.p95_latency,
-                'successful': r.successful,
-                'failed': r.failed,
-            }
-            for r in parallel_results
-        ]
-    }
 
 
 def call_model(api_url: str, model_id: str, prompt: str,
@@ -1288,56 +1032,6 @@ def run_practical_tests(api_url: str, model_id: str,
     return results
 
 
-def run_long_context_test(api_url: str, model_id: str,
-                          settings: dict = None) -> List[TestResult]:
-    """Run long context understanding tests."""
-    results = []
-    settings = settings or {}
-    
-    print(f"\n{C.CYAN}Running: Long Context Tests{C.RESET}")
-    
-    for i, q in enumerate(LONG_CONTEXT_TEST["questions"]):
-        print(f"\n  Question {i+1}...")
-        
-        response, tokens, elapsed, ttft = call_model(
-            api_url, model_id, q["prompt"],
-            max_tokens=settings.get('max_tokens', 4096),
-            temperature=settings.get('temperature', 0.0),
-            timeout=settings.get('timeout', 300)
-        )
-
-        # Check for key points
-        response_lower = response.lower()
-        found_points = 0
-        details = {}
-        for point in q["key_points"]:
-            if point.lower() in response_lower:
-                found_points += 1
-                details[point] = "PASS"
-            else:
-                details[point] = "FAIL"
-
-        score = found_points / len(q["key_points"])
-        passed = score >= 0.6
-
-        result = TestResult(
-            name=f"Long Context Q{i+1}",
-            passed=passed,
-            score=found_points,
-            max_score=len(q["key_points"]),
-            details=details,
-            response=response[:500],
-            tokens_used=tokens,
-            time_seconds=elapsed,
-            ttft_seconds=ttft
-        )
-        results.append(result)
-
-        status = f"{C.PASS}PASS" if passed else f"{C.FAIL}FAIL"
-        print(f"    {status} {found_points}/{len(q['key_points'])} key points ({elapsed:.1f}s){C.RESET}")
-        
-    return results
-
 
 def print_comparison_report(results: List[ModelResults]):
     """Print formatted comparison report."""
@@ -1416,55 +1110,6 @@ def print_comparison_report(results: List[ModelResults]):
             ttft_row += f"{'N/A':>15}"
     print(ttft_row)
     
-    # Parallel results (if available)
-    has_parallel = any(m.parallel_results for m in results)
-    if has_parallel:
-        print(f"\n{C.CYAN}PARALLEL BENCHMARK{C.RESET}")
-        print("-" * 72)
-        print(f"{'Concurrency':<15}", end="")
-        for model in results:
-            print(f"{model.name[:15]:>15}", end="")
-        print()
-        print("-" * 72)
-
-        # Find all concurrency levels tested
-        all_conc = set()
-        for model in results:
-            if model.parallel_results and 'results' in model.parallel_results:
-                for r in model.parallel_results['results']:
-                    all_conc.add(r['concurrency'])
-
-        for conc in sorted(all_conc):
-            row = f"{conc:<15}"
-            for model in results:
-                if model.parallel_results and 'results' in model.parallel_results:
-                    r = next((x for x in model.parallel_results['results'] if x['concurrency'] == conc), None)
-                    if r:
-                        row += f"{r['throughput']:>12.1f} t/s"
-                    else:
-                        row += f"{'N/A':>15}"
-                else:
-                    row += f"{'N/A':>15}"
-            print(row)
-
-        # Peak throughput
-        peak_row = f"{'Peak'::<15}"
-        for model in results:
-            if model.parallel_results and 'peak_throughput' in model.parallel_results:
-                peak_row += f"{C.PASS}{model.parallel_results['peak_throughput']:>12.1f} t/s{C.RESET}"
-            else:
-                peak_row += f"{'N/A':>15}"
-        print(peak_row)
-
-        # Optimal concurrency
-        opt_row = f"{'Optimal Conc.':<15}"
-        for model in results:
-            if model.parallel_results and 'optimal_concurrency' in model.parallel_results:
-                opt_row += f"{model.parallel_results['optimal_concurrency']:>15}"
-            else:
-                opt_row += f"{'N/A':>15}"
-        print(opt_row)
-
     # GPU info (if available)
     has_gpu = any(m.gpu_info.get('detected') for m in results)
     if has_gpu:
@@ -1516,7 +1161,6 @@ def save_results(results: List[ModelResults], output_dir: str, server_config: Di
                     sum(t.ttft_seconds for t in model.tests) / len(model.tests), 4
                 ) if model.tests else 0.0,
             },
-            "parallel": model.parallel_results if model.parallel_results else None,
         }
         data.append(model_data)
 
@@ -1537,21 +1181,24 @@ def load_config(config_path: str) -> dict:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Model Comparison Test Harness v2.0",
+        description=f"Model Quality Test Harness v{VERSION} — sequential quality scoring + TTFT",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   # Run with config file
   python compare_models.py --config models.yaml
-  
+
   # Quick test single model
   python compare_models.py --model seed-oss --api-url http://localhost:8000/v1
-  
+
   # Run specific tests only
   python compare_models.py --tests nightmare hiveos_wrapper
-  
+
   # List available tests
   python compare_models.py --list-tests
+
+For parallel/decode/long-context benchmarks, use the standalone tools
+or run_all.py as the orchestrated entry point.
         """
     )
     
@@ -1565,16 +1212,8 @@ Examples:
                        help='Output directory for results')
     parser.add_argument('--quick', action='store_true',
                        help='Quick mode - skip slow tests')
-    parser.add_argument('--long-context', action='store_true',
-                       help='Include long context tests')
     parser.add_argument('--list-tests', action='store_true',
                        help='List available tests and exit')
-    parser.add_argument('--parallel', action='store_true',
-                       help='Include parallel benchmark (tests concurrent request throughput)')
-    parser.add_argument('--parallel-only', action='store_true',
-                       help='Run only the parallel benchmark, skip sequential tests')
-    parser.add_argument('--max-concurrent', type=int, default=32,
-                       help='Maximum concurrency for parallel tests (default: 32)')
     parser.add_argument('--version', action='version', version=f'%(prog)s {VERSION}')
 
     # Server config metadata (recorded in JSON output for reproducibility)
@@ -1672,9 +1311,6 @@ Examples:
         print(f"Config: {cfg_str}")
     print(f"Tests: {', '.join(tests_to_run)}")
     print(f"Models: {len(config['models'])}")
-    if args.parallel or args.parallel_only:
-        print(f"Mode: {'Parallel only' if args.parallel_only else 'Sequential + Parallel'}")
-        print(f"Max concurrent: {args.max_concurrent}")
     
     # Run tests for each model
     all_results = []
@@ -1696,57 +1332,29 @@ Examples:
         # Warmup
         run_warmup(model_config['api_url'], model_id)
 
-        # Run sequential practical tests (unless --parallel-only)
-        if not args.parallel_only:
-            print(f"\n{C.BOLD}LEG 1: SEQUENTIAL (Latency Mode){C.RESET}")
-            print("-" * 40)
+        # Run sequential practical tests
+        print(f"\n{C.BOLD}SEQUENTIAL QUALITY TESTS{C.RESET}")
+        print("-" * 40)
 
-            practical_results = run_practical_tests(
-                model_config['api_url'],
-                model_id,
-                tests=tests_to_run,
-                settings=config.get('settings', {})
-            )
-            model_results.tests.extend(practical_results)
+        practical_results = run_practical_tests(
+            model_config['api_url'],
+            model_id,
+            tests=tests_to_run,
+            settings=config.get('settings', {})
+        )
+        model_results.tests.extend(practical_results)
 
-            # Calculate sequential throughput and TTFT summary
-            total_tokens = sum(t.tokens_used for t in practical_results)
-            total_time = sum(t.time_seconds for t in practical_results)
-            seq_throughput = total_tokens / total_time if total_time > 0 else 0
-            model_results.throughput = seq_throughput
+        # Calculate sequential throughput and TTFT summary
+        total_tokens = sum(t.tokens_used for t in practical_results)
+        total_time = sum(t.time_seconds for t in practical_results)
+        seq_throughput = total_tokens / total_time if total_time > 0 else 0
+        model_results.throughput = seq_throughput
 
-            # Print TTFT summary
-            ttfts = [t.ttft_seconds for t in practical_results if t.ttft_seconds > 0]
-            if ttfts:
-                avg_ttft = sum(ttfts) / len(ttfts)
-                print(f"\n  Avg TTFT (prefill): {avg_ttft:.2f}s across {len(ttfts)} tests")
-
-        # Run parallel benchmark if requested
-        parallel_data = None
-        if args.parallel or args.parallel_only:
-            print(f"\n{C.BOLD}LEG 2: PARALLEL (Throughput Mode){C.RESET}")
-            print("-" * 40)
-
-            parallel_data = run_parallel_benchmark(
-                model_config['api_url'],
-                model_id,
-                tests_to_run,
-                max_concurrent=args.max_concurrent,
-                max_tokens=config.get('settings', {}).get('max_tokens', 512),
-                timeout=config.get('settings', {}).get('timeout', 300)
-            )
-
-            if parallel_data:
-                model_results.parallel_results = parallel_data
-
-        # Run long context tests if requested
-        if args.long_context and not args.parallel_only:
-            lc_results = run_long_context_test(
-                model_config['api_url'],
-                model_id,
-                settings=config.get('settings', {})
-            )
-            model_results.tests.extend(lc_results)
+        # Print TTFT summary
+        ttfts = [t.ttft_seconds for t in practical_results if t.ttft_seconds > 0]
+        if ttfts:
+            avg_ttft = sum(ttfts) / len(ttfts)
+            print(f"\n  Avg TTFT (prefill): {avg_ttft:.2f}s across {len(ttfts)} tests")
 
         # Store GPU info
         model_results.gpu_info = gpu_info

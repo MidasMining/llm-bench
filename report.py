@@ -6,11 +6,14 @@ showing quality, decode rate, prefill latency, and concurrency scaling in
 one view.
 
 Usage:
+  # From a run_all.py run directory:
+  python report.py --run-dir results/a4000-qwen3-v3.0-20260621-184233/
+
   # Auto-discover results for a model:
   python report.py --model seed-oss
 
   # Specify results directories:
-  python report.py --compare-dir results/8xA4000 --decode-dir results/decode \
+  python report.py --compare-dir results/8xA4000 --decode-dir results/decode \\
       --parallel-dir results/parallel
 
   # Generate markdown report:
@@ -187,7 +190,37 @@ def format_parallel_section(data: Dict) -> str:
     return "\n".join(lines)
 
 
-def generate_report(compare_result, decode_result, parallel_result, format_type="text"):
+def discover_run_dir(run_dir: str, model_filter: str = None) -> tuple:
+    """Auto-discover results within a run_all.py structured run directory.
+
+    Expected structure:
+        run_dir/
+        ├── RUN_METADATA.json
+        ├── quality/     → comparison_*.json
+        ├── decode/      → decode_rate_*.json
+        └── parallel/    → parallel_benchmark_*.json
+
+    Returns (compare_result, decode_result, parallel_result).
+    """
+    compare_result = decode_result = parallel_result = None
+
+    quality_dir = os.path.join(run_dir, "quality")
+    if os.path.isdir(quality_dir):
+        compare_result = find_latest_result(quality_dir, "comparison", model_filter)
+
+    decode_dir = os.path.join(run_dir, "decode")
+    if os.path.isdir(decode_dir):
+        decode_result = find_latest_result(decode_dir, "decode_rate", model_filter)
+
+    parallel_dir = os.path.join(run_dir, "parallel")
+    if os.path.isdir(parallel_dir):
+        parallel_result = find_latest_result(parallel_dir, "parallel_benchmark", model_filter)
+
+    return compare_result, decode_result, parallel_result
+
+
+def generate_report(compare_result, decode_result, parallel_result,
+                    format_type="text", run_metadata=None):
     """Generate unified report from available results."""
     sections = []
 
@@ -200,6 +233,27 @@ def generate_report(compare_result, decode_result, parallel_result, format_type=
         sections.append(sep)
         sections.append(f"  {header}")
         sections.append(sep)
+
+    # Run metadata (from run_all.py)
+    if run_metadata:
+        if format_type == "markdown":
+            sections.append("\n## Run Info\n")
+            sections.append(f"- **Run name**: {run_metadata.get('run_name', '?')}")
+            sections.append(f"- **Model**: {run_metadata.get('model', '?')}")
+            sections.append(f"- **Hardware**: {run_metadata.get('hardware', '?')}")
+            sections.append(f"- **Backend**: {run_metadata.get('backend', '?')}")
+            sections.append(f"- **Created**: {run_metadata.get('created_at', '?')}")
+            sections.append(f"- **Bench version**: {run_metadata.get('bench_version', '?')}")
+        else:
+            sections.append(f"\n{'─'*70}")
+            sections.append("RUN INFO")
+            sections.append(f"{'─'*70}")
+            sections.append(f"  Run name:  {run_metadata.get('run_name', '?')}")
+            sections.append(f"  Model:     {run_metadata.get('model', '?')}")
+            sections.append(f"  Hardware:  {run_metadata.get('hardware', '?')}")
+            sections.append(f"  Backend:   {run_metadata.get('backend', '?')}")
+            sections.append(f"  Created:   {run_metadata.get('created_at', '?')}")
+            sections.append(f"  Version:   {run_metadata.get('bench_version', '?')}")
 
     # Quality section
     if compare_result:
@@ -291,6 +345,15 @@ def generate_report(compare_result, decode_result, parallel_result, format_type=
     if format_type != "markdown":
         sections.append(f"\n{sep}")
 
+    # Historical clarity note
+    note = ("Note: throughput numbers from bench versions before v2.0 counted "
+            "prompt+completion tokens and should not be compared to v2+ "
+            "completion-only decode rates. See REFACTORING.md for details.")
+    if format_type == "markdown":
+        sections.append(f"\n---\n\n*{note}*")
+    else:
+        sections.append(f"\n  {note}")
+
     return "\n".join(sections)
 
 
@@ -299,6 +362,8 @@ def main():
         description="Unified benchmark report — combines quality, decode, and concurrency results."
     )
     parser.add_argument("--model", type=str, help="Model name filter (substring match)")
+    parser.add_argument("--run-dir", type=str, default=None,
+                        help="run_all.py run directory (auto-discovers quality/decode/parallel subdirs)")
     parser.add_argument("--compare-dir", type=str, default="results",
                         help="Directory to search for comparison results")
     parser.add_argument("--decode-dir", type=str, default="results/decode",
@@ -309,45 +374,67 @@ def main():
                         help="Output format")
     args = parser.parse_args()
 
-    # Search across common result locations
-    compare_dirs = [args.compare_dir, "results/8xA4000", "results/compare"]
-    decode_dirs = [args.decode_dir]
-    parallel_dirs = [args.parallel_dir, "results/8xA4000"]
+    run_metadata = None
 
-    # Find latest results
-    compare_result = None
-    for d in compare_dirs:
-        if os.path.isdir(d):
-            result = find_latest_result(d, "comparison", args.model)
-            if result:
-                compare_result = result
-                break
+    if args.run_dir:
+        # Structured run directory mode
+        if not os.path.isdir(args.run_dir):
+            print(f"Run directory not found: {args.run_dir}", file=sys.stderr)
+            sys.exit(1)
 
-    decode_result = None
-    for d in decode_dirs:
-        if os.path.isdir(d):
-            result = find_latest_result(d, "decode_rate", args.model)
-            if result:
-                decode_result = result
-                break
+        # Load metadata if available
+        meta_path = os.path.join(args.run_dir, "RUN_METADATA.json")
+        if os.path.isfile(meta_path):
+            with open(meta_path) as f:
+                run_metadata = json.load(f)
 
-    parallel_result = None
-    for d in parallel_dirs:
-        if os.path.isdir(d):
-            result = find_latest_result(d, "parallel_benchmark", args.model)
-            if result:
-                parallel_result = result
-                break
+        compare_result, decode_result, parallel_result = discover_run_dir(
+            args.run_dir, args.model
+        )
 
-    if not any([compare_result, decode_result, parallel_result]):
-        print("No results found. Run benchmarks first or check --*-dir paths.", file=sys.stderr)
-        print(f"\nSearched:", file=sys.stderr)
-        print(f"  compare: {compare_dirs}", file=sys.stderr)
-        print(f"  decode:  {decode_dirs}", file=sys.stderr)
-        print(f"  parallel: {parallel_dirs}", file=sys.stderr)
-        sys.exit(1)
+        if not any([compare_result, decode_result, parallel_result]):
+            print(f"No results found in run directory: {args.run_dir}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        # Legacy: search across common result locations
+        compare_dirs = [args.compare_dir, "results/8xA4000", "results/compare"]
+        decode_dirs = [args.decode_dir]
+        parallel_dirs = [args.parallel_dir, "results/8xA4000"]
 
-    report = generate_report(compare_result, decode_result, parallel_result, args.format)
+        compare_result = None
+        for d in compare_dirs:
+            if os.path.isdir(d):
+                result = find_latest_result(d, "comparison", args.model)
+                if result:
+                    compare_result = result
+                    break
+
+        decode_result = None
+        for d in decode_dirs:
+            if os.path.isdir(d):
+                result = find_latest_result(d, "decode_rate", args.model)
+                if result:
+                    decode_result = result
+                    break
+
+        parallel_result = None
+        for d in parallel_dirs:
+            if os.path.isdir(d):
+                result = find_latest_result(d, "parallel_benchmark", args.model)
+                if result:
+                    parallel_result = result
+                    break
+
+        if not any([compare_result, decode_result, parallel_result]):
+            print("No results found. Run benchmarks first or check --*-dir paths.", file=sys.stderr)
+            print(f"\nSearched:", file=sys.stderr)
+            print(f"  compare: {compare_dirs}", file=sys.stderr)
+            print(f"  decode:  {decode_dirs}", file=sys.stderr)
+            print(f"  parallel: {parallel_dirs}", file=sys.stderr)
+            sys.exit(1)
+
+    report = generate_report(compare_result, decode_result, parallel_result,
+                             args.format, run_metadata=run_metadata)
     print(report)
 
 

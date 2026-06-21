@@ -1,4 +1,4 @@
-# LLM Benchmark Suite v2.1
+# LLM Benchmark Suite v3.0
 
 Comprehensive benchmarking suite for evaluating local LLM models on real-world coding and debugging tasks. Tests models on production mining pool code with bugs ranging from easy threading issues to expert-level crypto byte order vulnerabilities.
 
@@ -221,36 +221,44 @@ See the README in each patches dir for the diff and apply instructions.
 
 ```bash
 # Install
-pip install pyyaml requests
+pip install pyyaml requests aiohttp
 
-# Quality bench (5 prompts, 22 pass/fail checks against rubric)
+# === Canonical entry point: run_all.py ===
+# Full benchmarking run (quality + decode + parallel + long-context)
+python run_all.py \
+  --run-name a4000-qwen3-32b-vllm \
+  --model Qwen/Qwen3-32B \
+  --api-url http://localhost:8000/v1 \
+  --hardware "8x RTX A4000" --backend "vLLM" \
+  --report
+
+# Skip legs you don't need:
+python run_all.py --run-name quick --model <model-id> --api-url http://... \
+  --skip-parallel --skip-context
+
+# === Standalone tools ===
+
+# Quality bench only (5 prompts, 22 pass/fail checks against rubric)
 python compare_models.py --model <model-id> --api-url http://localhost:8000/v1
 
-# With parallel throughput test
-python compare_models.py --model <model-id> --api-url http://localhost:8000/v1 --parallel
-
-# With server config metadata
-python compare_models.py --model <model-id> --api-url http://localhost:8000/v1 \
-  --parallel --tp 8 --framework vllm --quant-method awq \
-  --output ./results/8xA4000
-
 # Decode-rate benchmark (single-stream, isolates decode from prefill cost)
-# Outputs JSON to results/decode/ by default
 python decode_rate_bench.py --api-url http://localhost:8000/v1 --model <model-id> \
   --tag "config description" --targets 500 2000 4000 8000 14000
 
-# Custom output directory:
-python decode_rate_bench.py --model <model-id> --output results/decode/ \
-  --targets 500 2000 4000 6000 8000
+# Parallel throughput benchmark
+python parallel_benchmark.py --model <model-id> --api-url http://localhost:8000/v1 \
+  --max-concurrent 64
 
-# Stdout-only (no JSON file):
-python decode_rate_bench.py --model <model-id> --no-json
+# Long-context functional test
+python long_context_test.py --model <model-id> --api-url http://localhost:8000/v1 \
+  --context-size 32000
 ```
 
 ### When to use which
 
 | Tool | Purpose | Output |
 |------|---------|--------|
+| **`run_all.py`** | **Canonical entry point** — full model/hardware vetting | Versioned run directory with `RUN_METADATA.json` + all tool outputs |
 | `compare_models.py` | "Is this model worth running?" | Quality score (22-check rubric) + per-test TTFT + throughput |
 | `decode_rate_bench.py` | "How fast is this kernel/config?" | JSON + table: per-context decode rate, TTFT (prefill), median/min/max stats, prefill scaling curve |
 | `parallel_benchmark.py` | Multi-stream peak throughput | Concurrency-scaling curve with TTFT + completion-only t/s |
@@ -258,11 +266,27 @@ python decode_rate_bench.py --model <model-id> --no-json
 | `report.py` | Unified view of all results | Combined summary: quality + decode + concurrency |
 | `tool_call_benchmark/` | Multi-step SSH tool-call reliability | See subdir README |
 
+`run_all.py` is the recommended way to run benchmarks — it calls all standalone tools
+with consistent args and groups results into a timestamped run directory:
+
+```
+results/a4000-qwen3-32b-vllm-v3.0-20260621-184233/
+├── RUN_METADATA.json       # model, hardware, backend, tool versions, CLI
+├── quality/                # compare_models.py output
+├── decode/                 # decode_rate_bench.py output
+├── parallel/               # parallel_benchmark.py output
+├── context/                # long_context_test.py output
+└── report/                 # report.py output (if --report)
+```
+
 `decode_rate_bench.py` is the canonical "how fast does it decode?" tool — use it when comparing kernels, KV-quant settings, or autotune results. `compare_models.py` reports throughput as a side effect of quality testing, but its numbers are distorted by reasoning-token accounting on thinking models. For honest decode-rate comparisons, prefer `decode_rate_bench.py`.
 
 `report.py` combines results from all three tools into a single view:
 ```bash
-# Auto-discover results for a model:
+# From a run_all.py run directory:
+python report.py --run-dir results/a4000-qwen3-32b-vllm-v3.0-20260621-184233/
+
+# Or auto-discover results for a model:
 python report.py --model seed-oss
 
 # Generate markdown:
@@ -270,6 +294,9 @@ python report.py --model seed-oss --format markdown > MODEL_REPORT.md
 ```
 
 For the multi-step SSH tool-call reliability bench, see `tool_call_benchmark/README.md`.
+
+See [REFACTORING.md](REFACTORING.md) for version history, migration guide, and why
+old throughput numbers should not be compared to v2+ decode-rate numbers.
 
 ### Metric definitions
 
@@ -290,24 +317,33 @@ For the multi-step SSH tool-call reliability bench, see `tool_call_benchmark/REA
 
 ```
 llm-bench/
-├── compare_models.py              # main benchmark harness (v2.1) — quality + per-test TTFT
+├── run_all.py                     # canonical entry point (v3.0) — orchestrates all tools
+├── compare_models.py              # quality benchmark (v3.0) — 22-check rubric + per-test TTFT
 ├── decode_rate_bench.py           # single-stream decode-rate bench (v2.0) — prefill vs decode isolated
 ├── parallel_benchmark.py          # throughput benchmark (v2.0) — concurrency scaling + TTFT
-├── report.py                      # unified report generator — combines all three tools
+├── report.py                      # unified report generator — combines all tools, supports --run-dir
 ├── long_context_test.py           # long-context functional test
 ├── models.yaml                    # model configurations
+├── REFACTORING.md                 # version history, migration guide, historical clarity
 ├── CONSOLIDATED-FINDINGS.md       # detailed analysis and findings (8x A4000 sweep)
 ├── MODEL-RESULTS-2026.md          # cross-model results summary
 ├── practical/                     # individual test scripts (mining pool scenarios)
 ├── tool_call_benchmark/           # multi-step SSH tool-call reliability bench
 ├── docs/                          # quickstarts, install guide, planned bench notes
 ├── results/                       # structured JSON benchmark output
-│   ├── 8xA4000/                   # 8x RTX A4000 sweep
-│   ├── compare/                   # quality comparison runs
-│   ├── decode/                    # decode-rate bench (prefill vs decode isolated)
-│   ├── gen4/                      # PCIe Gen4 test results
-│   ├── parallel/                  # throughput-only runs
-│   └── tp8/                       # TP=8 scaling runs
+│   ├── <run-name>-v3.0-YYYYMMDD-HHMMSS/  # run_all.py versioned run directories
+│   │   ├── RUN_METADATA.json
+│   │   ├── quality/
+│   │   ├── decode/
+│   │   ├── parallel/
+│   │   ├── context/
+│   │   └── report/
+│   ├── 8xA4000/                   # legacy: 8x RTX A4000 sweep
+│   ├── compare/                   # legacy: quality comparison runs
+│   ├── decode/                    # legacy: decode-rate bench
+│   ├── gen4/                      # legacy: PCIe Gen4 test results
+│   ├── parallel/                  # legacy: throughput-only runs
+│   └── tp8/                       # legacy: TP=8 scaling runs
 ├── archive/
 │   └── patches/                   # vLLM patches now obsolete upstream
 └── projects/
@@ -356,5 +392,5 @@ The repo holds two kinds of content:
 
 MIT License
 
-*Created: January 2026 | Updated: February 2026*
+*Created: January 2026 | Updated: June 2026*
 *For: Mining Pool Development & AI Model Evaluation*
