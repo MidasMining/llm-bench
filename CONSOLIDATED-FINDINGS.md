@@ -2,6 +2,13 @@
 **Updated: February 15, 2026**
 **Platform: 8x RTX A4000 (16GB each, 128GB total), EPYC 7532 (Rome), PCIe Gen4**
 
+> **Note (June 2026):** Throughput numbers in this document were measured with
+> benchmark v1.0 which counted total_tokens (prompt + completion). Since v2.0,
+> all tools report completion-tokens-only throughput, which gives lower but more
+> accurate numbers. Use `decode_rate_bench.py` for properly isolated decode
+> rates and `parallel_benchmark.py v2.0` for concurrency scaling with TTFT.
+> See `report.py` for unified cross-tool views.
+
 ---
 
 ## Full Model Benchmark (Feb 12-14, 2026)

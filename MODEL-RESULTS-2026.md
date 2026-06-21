@@ -1,6 +1,10 @@
 # Model Benchmark Results — 8x RTX A4000 (128GB VRAM)
 Last updated: 2026-04-09
 
+> **Note (June 2026):** Throughput figures below used v1.0 measurement
+> (total_tokens / time). Since v2.0, tools report completion-tokens-only
+> throughput. For current metrics with TTFT separation, run `report.py`.
+
 ## Hardware
 - 8x NVIDIA RTX A4000 (16GB each, 128GB total)
 - AMD EPYC 7532, PCIe Gen4
