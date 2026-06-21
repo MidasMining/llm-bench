@@ -235,8 +235,16 @@ python compare_models.py --model <model-id> --api-url http://localhost:8000/v1 \
   --output ./results/8xA4000
 
 # Decode-rate benchmark (single-stream, isolates decode from prefill cost)
+# Outputs JSON to results/decode/ by default
 python decode_rate_bench.py --api-url http://localhost:8000/v1 --model <model-id> \
   --tag "config description" --targets 500 2000 4000 8000 14000
+
+# Custom output directory:
+python decode_rate_bench.py --model <model-id> --output results/decode/ \
+  --targets 500 2000 4000 6000 8000
+
+# Stdout-only (no JSON file):
+python decode_rate_bench.py --model <model-id> --no-json
 ```
 
 ### When to use which
@@ -244,7 +252,7 @@ python decode_rate_bench.py --api-url http://localhost:8000/v1 --model <model-id
 | Tool | Purpose | Output |
 |------|---------|--------|
 | `compare_models.py` | "Is this model worth running?" | Quality score (22-check rubric) + ballpark throughput |
-| `decode_rate_bench.py` | "How fast is this kernel/config?" | Pure single-stream decode rate (t/s) at varying context, separated TTFT, handles `reasoning_content` deltas |
+| `decode_rate_bench.py` | "How fast is this kernel/config?" | JSON + table: per-context decode rate, TTFT (prefill), median/min/max stats, prefill scaling curve |
 | `parallel_benchmark.py` | Multi-stream peak throughput | Concurrency-scaling t/s curve |
 | `long_context_test.py` | Functional test at long context | Pass/fail at target ctx |
 | `tool_call_benchmark/` | Multi-step SSH tool-call reliability | See subdir README |
@@ -267,9 +275,10 @@ llm-bench/
 ├── practical/                     # individual test scripts (mining pool scenarios)
 ├── tool_call_benchmark/           # multi-step SSH tool-call reliability bench
 ├── docs/                          # quickstarts, install guide, planned bench notes
-├── results/                       # generic bench output
+├── results/                       # structured JSON benchmark output
 │   ├── 8xA4000/                   # 8x RTX A4000 sweep
 │   ├── compare/                   # quality comparison runs
+│   ├── decode/                    # decode-rate bench (prefill vs decode isolated)
 │   ├── gen4/                      # PCIe Gen4 test results
 │   ├── parallel/                  # throughput-only runs
 │   └── tp8/                       # TP=8 scaling runs

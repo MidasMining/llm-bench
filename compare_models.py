@@ -826,6 +826,7 @@ class TestResult:
     response: str = ""
     tokens_used: int = 0
     time_seconds: float = 0.0
+    ttft_seconds: float = 0.0  # Time to first token (prefill latency)
 
 @dataclass
 class ModelResults:
@@ -1118,46 +1119,91 @@ def run_parallel_benchmark(
 def call_model(api_url: str, model_id: str, prompt: str,
                max_tokens: int = 8192, temperature: float = 0.0,
                timeout: int = 600, debug: bool = False) -> tuple:
-    """Call model API and return (response, tokens_used, time_seconds)."""
+    """Call model API and return (response, tokens_used, time_seconds).
+
+    Uses streaming to measure TTFT (time to first token). Returns a 4-tuple:
+    (response_text, tokens_used, time_seconds, ttft_seconds).
+    For backwards compatibility, callers expecting 3 values still work via
+    the legacy 3-element unpack since ttft is appended.
+    """
     start_time = time.time()
+    ttft = None
 
     try:
         if debug:
-            print(f"  [DEBUG] Calling {api_url}/chat/completions...")
-        response = requests.post(
-            f"{api_url}/chat/completions",
-            json={
-                'model': model_id,
-                'messages': [{'role': 'user', 'content': prompt}],
-                'max_tokens': max_tokens,
-                'temperature': temperature,
-            },
-            timeout=timeout
-        )
+            print(f"  [DEBUG] Calling {api_url}/chat/completions (streaming)...")
 
-        if debug:
-            print(f"  [DEBUG] Status: {response.status_code}")
-        data = response.json()
-        msg = data['choices'][0]['message']
-        content = msg.get('content') or ''
-        # vLLM v0.20+ separates thinking into 'reasoning' field
-        reasoning = msg.get('reasoning') or msg.get('reasoning_content') or ''
+        payload = {
+            'model': model_id,
+            'messages': [{'role': 'user', 'content': prompt}],
+            'max_tokens': max_tokens,
+            'temperature': temperature,
+            'stream': True,
+            'stream_options': {'include_usage': True},
+        }
+
+        content_parts = []
+        reasoning_parts = []
+        pt = ct = 0
+
+        with requests.post(
+            f"{api_url}/chat/completions",
+            json=payload,
+            stream=True,
+            timeout=timeout,
+            headers={"Accept": "text/event-stream"},
+        ) as resp:
+            resp.raise_for_status()
+            for raw in resp.iter_lines(decode_unicode=True):
+                if not raw:
+                    continue
+                if not raw.startswith("data: "):
+                    continue
+                payload_str = raw[6:]
+                if payload_str == "[DONE]":
+                    break
+                try:
+                    ev = json.loads(payload_str)
+                except json.JSONDecodeError:
+                    continue
+                if ev.get("usage"):
+                    pt = ev["usage"].get("prompt_tokens", pt)
+                    ct = ev["usage"].get("completion_tokens", ct)
+                choices = ev.get("choices") or []
+                if choices:
+                    delta = choices[0].get("delta") or {}
+                    chunk = delta.get("content") or ""
+                    reasoning_chunk = (delta.get("reasoning")
+                                       or delta.get("reasoning_content") or "")
+                    if (chunk or reasoning_chunk) and ttft is None:
+                        ttft = time.time() - start_time
+                    if chunk:
+                        content_parts.append(chunk)
+                    if reasoning_chunk:
+                        reasoning_parts.append(reasoning_chunk)
+
+        elapsed = time.time() - start_time
+        if ttft is None:
+            ttft = elapsed
+
+        content = "".join(content_parts)
+        reasoning = "".join(reasoning_parts)
         if reasoning and not content:
             content = reasoning
         elif reasoning:
             content = reasoning + '\n' + content
-        tokens = data.get('usage', {}).get('total_tokens', 0)
-        elapsed = time.time() - start_time
+
+        tokens = pt + ct  # total_tokens
 
         if debug:
-            print(f"  [DEBUG] Got {tokens} tokens in {elapsed:.1f}s")
-        return strip_thinking_tags(content), tokens, elapsed
+            print(f"  [DEBUG] Got {tokens} tokens in {elapsed:.1f}s (TTFT={ttft:.2f}s)")
+        return strip_thinking_tags(content), tokens, elapsed, ttft
 
     except Exception as e:
         elapsed = time.time() - start_time
         if debug:
             print(f"  [DEBUG] ERROR: {type(e).__name__}: {e}")
-        return f"ERROR: {e}", 0, elapsed
+        return f"ERROR: {e}", 0, elapsed, elapsed
 
 
 def evaluate_practical_test(test_key: str, response: str) -> tuple:
@@ -1201,17 +1247,17 @@ def run_practical_tests(api_url: str, model_id: str,
         test = PRACTICAL_TESTS[test_key]
         print(f"\n{C.CYAN}Running: {test['name']} ({test['difficulty']}){C.RESET}")
         
-        response, tokens, elapsed = call_model(
+        response, tokens, elapsed, ttft = call_model(
             api_url, model_id, test["prompt"],
             max_tokens=settings.get('max_tokens', 8192),
             temperature=settings.get('temperature', 0.0),
             timeout=settings.get('timeout', 600),
             debug=True
         )
-        
+
         score, max_score, details = evaluate_practical_test(test_key, response)
         passed = score >= test["expected_bugs"]
-        
+
         result = TestResult(
             name=test["name"],
             passed=passed,
@@ -1220,13 +1266,14 @@ def run_practical_tests(api_url: str, model_id: str,
             details=details,
             response=response[:1000],  # Truncate for storage
             tokens_used=tokens,
-            time_seconds=elapsed
+            time_seconds=elapsed,
+            ttft_seconds=ttft
         )
         results.append(result)
-        
+
         # Print result
         status = f"{C.PASS}PASS" if passed else f"{C.FAIL}FAIL"
-        print(f"  {status} {score}/{max_score} found ({elapsed:.1f}s, {tokens} tokens){C.RESET}")
+        print(f"  {status} {score}/{max_score} found ({elapsed:.1f}s, TTFT={ttft:.2f}s, {tokens} tokens){C.RESET}")
         for check, result_str in details.items():
             color = C.PASS if result_str == "PASS" else C.FAIL
             print(f"    {color}[{result_str}]{C.RESET} {check}")
@@ -1245,13 +1292,13 @@ def run_long_context_test(api_url: str, model_id: str,
     for i, q in enumerate(LONG_CONTEXT_TEST["questions"]):
         print(f"\n  Question {i+1}...")
         
-        response, tokens, elapsed = call_model(
+        response, tokens, elapsed, ttft = call_model(
             api_url, model_id, q["prompt"],
             max_tokens=settings.get('max_tokens', 4096),
             temperature=settings.get('temperature', 0.0),
             timeout=settings.get('timeout', 300)
         )
-        
+
         # Check for key points
         response_lower = response.lower()
         found_points = 0
@@ -1262,10 +1309,10 @@ def run_long_context_test(api_url: str, model_id: str,
                 details[point] = "PASS"
             else:
                 details[point] = "FAIL"
-        
+
         score = found_points / len(q["key_points"])
         passed = score >= 0.6
-        
+
         result = TestResult(
             name=f"Long Context Q{i+1}",
             passed=passed,
@@ -1274,10 +1321,11 @@ def run_long_context_test(api_url: str, model_id: str,
             details=details,
             response=response[:500],
             tokens_used=tokens,
-            time_seconds=elapsed
+            time_seconds=elapsed,
+            ttft_seconds=ttft
         )
         results.append(result)
-        
+
         status = f"{C.PASS}PASS" if passed else f"{C.FAIL}FAIL"
         print(f"    {status} {found_points}/{len(q['key_points'])} key points ({elapsed:.1f}s){C.RESET}")
         
@@ -1349,6 +1397,17 @@ def print_comparison_report(results: List[ModelResults]):
         else:
             throughput_row += f"{'N/A':>15}"
     print(throughput_row)
+
+    # TTFT (prefill latency)
+    ttft_row = f"{'Avg TTFT (prefill)':<30}"
+    for model in results:
+        ttfts = [t.ttft_seconds for t in model.tests if t.ttft_seconds > 0]
+        if ttfts:
+            avg_ttft = sum(ttfts) / len(ttfts)
+            ttft_row += f"{avg_ttft:>12.2f}s"
+        else:
+            ttft_row += f"{'N/A':>15}"
+    print(ttft_row)
     
     # Parallel results (if available)
     has_parallel = any(m.parallel_results for m in results)
@@ -1441,10 +1500,14 @@ def save_results(results: List[ModelResults], output_dir: str, server_config: Di
                         "details": t.details,
                         "tokens_used": t.tokens_used,
                         "time_seconds": t.time_seconds,
+                        "ttft_seconds": round(t.ttft_seconds, 4),
                     }
                     for t in model.tests
                 ],
                 "throughput": model.throughput,
+                "avg_ttft_seconds": round(
+                    sum(t.ttft_seconds for t in model.tests) / len(model.tests), 4
+                ) if model.tests else 0.0,
             },
             "parallel": model.parallel_results if model.parallel_results else None,
         }
@@ -1639,11 +1702,17 @@ Examples:
             )
             model_results.tests.extend(practical_results)
 
-            # Calculate sequential throughput
+            # Calculate sequential throughput and TTFT summary
             total_tokens = sum(t.tokens_used for t in practical_results)
             total_time = sum(t.time_seconds for t in practical_results)
             seq_throughput = total_tokens / total_time if total_time > 0 else 0
             model_results.throughput = seq_throughput
+
+            # Print TTFT summary
+            ttfts = [t.ttft_seconds for t in practical_results if t.ttft_seconds > 0]
+            if ttfts:
+                avg_ttft = sum(ttfts) / len(ttfts)
+                print(f"\n  Avg TTFT (prefill): {avg_ttft:.2f}s across {len(ttfts)} tests")
 
         # Run parallel benchmark if requested
         parallel_data = None
