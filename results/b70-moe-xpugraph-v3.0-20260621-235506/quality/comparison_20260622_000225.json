@@ -1,0 +1,100 @@
+[
+  {
+    "name": "Qwen3.6-35B-A3B",
+    "api_url": "http://127.0.0.1:8000/v1",
+    "timestamp": "2026-06-21T23:55:10.408203",
+    "gpu_info": {
+      "name": "Unknown",
+      "memory_mb": 0,
+      "driver": "Unknown",
+      "detected": false
+    },
+    "server_config": {
+      "framework": "vllm",
+      "framework_version": "0.1.dev1+gd272418f4"
+    },
+    "sequential": {
+      "tests": [
+        {
+          "name": "ZMQ Listener Bug",
+          "passed": true,
+          "score": 2,
+          "max_score": 2,
+          "details": {
+            "socket creation in main thread": "PASS",
+            "zmq context not thread safe this way": "PASS"
+          },
+          "tokens_used": 6712,
+          "time_seconds": 86.76009225845337,
+          "ttft_seconds": 0.1777
+        },
+        {
+          "name": "PPLNS Mining Pool Bugs",
+          "passed": true,
+          "score": 3,
+          "max_score": 3,
+          "details": {
+            "hardcoded share_window ignores config": "PASS",
+            "window_size calculated but not used": "PASS",
+            "config key mismatch": "PASS"
+          },
+          "tokens_used": 7270,
+          "time_seconds": 86.89685130119324,
+          "ttft_seconds": 0.192
+        },
+        {
+          "name": "Payment System Bugs",
+          "passed": false,
+          "score": 2,
+          "max_score": 4,
+          "details": {
+            "race condition": "PASS",
+            "sql injection": "FAIL",
+            "float precision": "PASS",
+            "atomicity": "FAIL"
+          },
+          "tokens_used": 7219,
+          "time_seconds": 86.85934090614319,
+          "ttft_seconds": 0.1639
+        },
+        {
+          "name": "Stratum Protocol Bugs",
+          "passed": true,
+          "score": 5,
+          "max_score": 5,
+          "details": {
+            "byte order / endianness": "PASS",
+            "logging before submit / info leak": "PASS",
+            "race condition / stale": "PASS",
+            "memory leak / pruning": "PASS",
+            "input validation / hex": "PASS"
+          },
+          "tokens_used": 7892,
+          "time_seconds": 86.89313244819641,
+          "ttft_seconds": 0.2371
+        },
+        {
+          "name": "HiveOS Wrapper Creation",
+          "passed": true,
+          "score": 8,
+          "max_score": 8,
+          "details": {
+            "uses heredocs": "PASS",
+            "h-manifest with CUSTOM_NAME": "PASS",
+            "uses CUSTOM_* variables": "PASS",
+            "creates h-config.sh": "PASS",
+            "creates h-run.sh with exec": "PASS",
+            "creates h-stats.sh with JSON": "PASS",
+            "correct directory structure": "PASS",
+            "api port configured": "PASS"
+          },
+          "tokens_used": 6495,
+          "time_seconds": 86.66169142723083,
+          "ttft_seconds": 0.1755
+        }
+      ],
+      "throughput": 81.9865669843771,
+      "avg_ttft_seconds": 0.1893
+    }
+  }
+]
