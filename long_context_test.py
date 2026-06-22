@@ -319,13 +319,19 @@ def call_model(api_url: str, model_id: str, prompt: str,
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": max_tokens,
                 "temperature": temperature,
+                "chat_template_kwargs": {"enable_thinking": False},
             },
             timeout=300
         )
         
         if response.status_code == 200:
             data = response.json()
-            return data["choices"][0]["message"]["content"]
+            msg = data["choices"][0]["message"]
+            content = msg.get("content") or ""
+            reasoning = msg.get("reasoning_content") or ""
+            if reasoning:
+                print(f"  [DEBUG] Model used reasoning ({len(reasoning)} chars)")
+            return content
         else:
             return f"ERROR: {response.status_code} - {response.text[:200]}"
             
