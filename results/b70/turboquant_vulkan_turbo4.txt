@@ -1,0 +1,18 @@
+ggml_vulkan: Found 1 Vulkan devices:
+ggml_vulkan: 0 = Intel(R) Graphics (BMG G31) (Intel open-source Mesa driver) | uma: 0 | fp16: 1 | bf16: 0 | warp size: 32 | shared memory: 131072 | int dot: 0 | matrix cores: KHR_coopmat
+| model                          |       size |     params | backend    | ngl | type_k | type_v |            test |                  t/s |
+| ------------------------------ | ---------: | ---------: | ---------- | --: | -----: | -----: | --------------: | -------------------: |
+| qwen35moe 35B.A3B Q4_K - Medium |  20.74 GiB |    35.51 B | Vulkan     | 999 | turbo4 | turbo4 |           pp512 |        828.24 ± 6.72 |
+| qwen35moe 35B.A3B Q4_K - Medium |  20.74 GiB |    35.51 B | Vulkan     | 999 | turbo4 | turbo4 |           tg128 |         35.25 ± 0.04 |
+
+build: 4595fff0b (9905)
+ggml_vulkan: Found 1 Vulkan devices:
+ggml_vulkan: 0 = Intel(R) Graphics (BMG G31) (Intel open-source Mesa driver) | uma: 0 | fp16: 1 | bf16: 0 | warp size: 32 | shared memory: 131072 | int dot: 0 | matrix cores: KHR_coopmat
+| model                          |       size |     params | backend    | ngl | type_k | type_v |            test |                  t/s |
+| ------------------------------ | ---------: | ---------: | ---------- | --: | -----: | -----: | --------------: | -------------------: |
+| qwen35moe 35B.A3B Q4_K - Medium |  20.74 GiB |    35.51 B | Vulkan     | 999 | turbo4 | turbo4 |          pp4096 |        585.25 ± 2.11 |
+| qwen35moe 35B.A3B Q4_K - Medium |  20.74 GiB |    35.51 B | Vulkan     | 999 | turbo4 | turbo4 |          pp8192 |        438.92 ± 0.71 |
+| qwen35moe 35B.A3B Q4_K - Medium |  20.74 GiB |    35.51 B | Vulkan     | 999 | turbo4 | turbo4 |         pp14336 |        321.31 ± 0.33 |
+| qwen35moe 35B.A3B Q4_K - Medium |  20.74 GiB |    35.51 B | Vulkan     | 999 | turbo4 | turbo4 |           tg128 |         35.35 ± 0.02 |
+
+build: 4595fff0b (9905)

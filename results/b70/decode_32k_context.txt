@@ -1,0 +1,18 @@
+=== B70 MoE XPU Graph FULL 32K ctx ===
+api=http://127.0.0.1:8000/v1 model=Qwen3.6-35B-A3B
+
+warmup: pt=18 ct=9 ttft=0.19s decode=0.09s total=0.30s
+
+ target  prompt  comp    ttft    decode       rate
+    500     554   500  0.14s    6.98s     71.5 t/s
+   4000    4054   500  0.52s    6.99s     71.4 t/s
+   8000    8054   500  1.07s    7.17s     69.6 t/s
+  14000   14054   355  2.03s    5.17s     68.5 t/s
+  24000   24054   500  3.93s    7.56s     66.0 t/s
+  30000   30054   500  5.27s    7.73s     64.6 t/s
+
+                            --- summary ---
+        median decode rate across contexts: 68.6 t/s
+            prefill scaling (TTFT min→max): 0.144s → 5.271s
+
+Results saved to: results/decode/decode_rate_Qwen3.6-35B-A3B_20260622_052800.json
