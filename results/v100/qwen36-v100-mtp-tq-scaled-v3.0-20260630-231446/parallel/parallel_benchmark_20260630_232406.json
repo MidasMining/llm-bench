@@ -1,0 +1,85 @@
+{
+  "version": "2.0",
+  "benchmark": "parallel",
+  "model": "Qwen3.6-V100",
+  "api_url": "http://192.168.1.60:8100/v1",
+  "timestamp": "20260630_232406",
+  "notes": {
+    "throughput_metric": "completion_tokens_only",
+    "description": "Throughput based on output (completion) tokens / wall time. Prompt tokens excluded. TTFT measured via streaming."
+  },
+  "sequential": {
+    "throughput_toks": 89.78,
+    "avg_latency_s": 4.573,
+    "avg_ttft_s": 0.0,
+    "completion_tokens": 2464,
+    "total_time_s": 27.446
+  },
+  "parallel": [
+    {
+      "concurrency": 1,
+      "throughput_toks": 73.63,
+      "per_request_toks": 73.63,
+      "avg_latency_s": 0.434,
+      "p50_latency_s": 0.434,
+      "p95_latency_s": 0.434,
+      "avg_ttft_s": 0.0854,
+      "p50_ttft_s": 0.0854,
+      "successful": 1,
+      "failed": 0
+    },
+    {
+      "concurrency": 2,
+      "throughput_toks": 95.93,
+      "per_request_toks": 47.97,
+      "avg_latency_s": 1.102,
+      "p50_latency_s": 1.102,
+      "p95_latency_s": 1.667,
+      "avg_ttft_s": 0.1311,
+      "p50_ttft_s": 0.1311,
+      "successful": 2,
+      "failed": 0
+    },
+    {
+      "concurrency": 4,
+      "throughput_toks": 144.45,
+      "per_request_toks": 36.11,
+      "avg_latency_s": 5.139,
+      "p50_latency_s": 4.87,
+      "p95_latency_s": 9.968,
+      "avg_ttft_s": 0.3091,
+      "p50_ttft_s": 0.2902,
+      "successful": 4,
+      "failed": 0
+    },
+    {
+      "concurrency": 8,
+      "throughput_toks": 217.54,
+      "per_request_toks": 27.19,
+      "avg_latency_s": 6.368,
+      "p50_latency_s": 6.577,
+      "p95_latency_s": 12.061,
+      "avg_ttft_s": 0.9402,
+      "p50_ttft_s": 0.9543,
+      "successful": 8,
+      "failed": 0
+    },
+    {
+      "concurrency": 16,
+      "throughput_toks": 341.58,
+      "per_request_toks": 21.35,
+      "avg_latency_s": 11.458,
+      "p50_latency_s": 14.765,
+      "p95_latency_s": 18.642,
+      "avg_ttft_s": 1.4809,
+      "p50_ttft_s": 1.4888,
+      "successful": 16,
+      "failed": 0
+    }
+  ],
+  "peak": {
+    "concurrency": 16,
+    "throughput_toks": 341.58,
+    "speedup_vs_sequential": 3.8
+  }
+}

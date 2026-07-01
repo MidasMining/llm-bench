@@ -1,0 +1,97 @@
+[
+  {
+    "name": "Qwen3.6-V100",
+    "api_url": "http://192.168.1.60:8100/v1",
+    "timestamp": "2026-06-30T23:14:46.469098",
+    "gpu_info": {
+      "name": "NVIDIA RTX A4000",
+      "memory_mb": 16376,
+      "driver": "580.76.05\nNVIDIA RTX A4000",
+      "detected": true
+    },
+    "server_config": {},
+    "sequential": {
+      "tests": [
+        {
+          "name": "ZMQ Listener Bug",
+          "passed": false,
+          "score": 0,
+          "max_score": 2,
+          "details": {
+            "socket creation in main thread": "FAIL",
+            "zmq context not thread safe this way": "FAIL"
+          },
+          "tokens_used": 6712,
+          "time_seconds": 66.15002703666687,
+          "ttft_seconds": 0.5618
+        },
+        {
+          "name": "PPLNS Mining Pool Bugs",
+          "passed": false,
+          "score": 0,
+          "max_score": 3,
+          "details": {
+            "hardcoded share_window ignores config": "FAIL",
+            "window_size calculated but not used": "FAIL",
+            "config key mismatch": "FAIL"
+          },
+          "tokens_used": 7270,
+          "time_seconds": 67.38784718513489,
+          "ttft_seconds": 1.2638
+        },
+        {
+          "name": "Payment System Bugs",
+          "passed": false,
+          "score": 0,
+          "max_score": 4,
+          "details": {
+            "race condition": "FAIL",
+            "sql injection": "FAIL",
+            "float precision": "FAIL",
+            "atomicity": "FAIL"
+          },
+          "tokens_used": 7219,
+          "time_seconds": 67.07503843307495,
+          "ttft_seconds": 1.2237
+        },
+        {
+          "name": "Stratum Protocol Bugs",
+          "passed": false,
+          "score": 1,
+          "max_score": 5,
+          "details": {
+            "byte order / endianness": "FAIL",
+            "logging before submit / info leak": "FAIL",
+            "race condition / stale": "FAIL",
+            "memory leak / pruning": "FAIL",
+            "input validation / hex": "PASS"
+          },
+          "tokens_used": 7892,
+          "time_seconds": 70.02837467193604,
+          "ttft_seconds": 3.4466
+        },
+        {
+          "name": "HiveOS Wrapper Creation",
+          "passed": false,
+          "score": 0,
+          "max_score": 8,
+          "details": {
+            "uses heredocs": "FAIL",
+            "h-manifest with CUSTOM_NAME": "FAIL",
+            "uses CUSTOM_* variables": "FAIL",
+            "creates h-config.sh": "FAIL",
+            "creates h-run.sh with exec": "FAIL",
+            "creates h-stats.sh with JSON": "FAIL",
+            "correct directory structure": "FAIL",
+            "api port configured": "FAIL"
+          },
+          "tokens_used": 6495,
+          "time_seconds": 65.78949427604675,
+          "ttft_seconds": 0.331
+        }
+      ],
+      "throughput": 105.7810460459291,
+      "avg_ttft_seconds": 1.3654
+    }
+  }
+]

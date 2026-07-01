@@ -1,0 +1,53 @@
+{
+  "context_size": 32000,
+  "model": "Qwen3.6-V100",
+  "overall": "FAIL",
+  "tests": [
+    {
+      "test": "needle_in_haystack",
+      "context_tokens": 32000,
+      "needle_position": 63702,
+      "expected": "0V0FU3CZ",
+      "response": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "found": false,
+      "status": "FAIL"
+    },
+    {
+      "test": "multi_file_understanding",
+      "context_tokens": 32000,
+      "expected_concepts": [
+        "handle_submit",
+        "validate_share",
+        "submit_block",
+        "process_block",
+        "pplns",
+        "payout"
+      ],
+      "found_concepts": [],
+      "score": 0.0,
+      "response": "Here is the step-by-step process:\n\n1.  **Initiate**: The process begins with the client sending the transaction.\n2.3333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333",
+      "status": "FAIL"
+    },
+    {
+      "test": "cross_reference",
+      "context_tokens": 32000,
+      "expected": {
+        "n_multiplier": "2.0",
+        "min_payout": "1.0",
+        "byte_order": "yes",
+        "port": "3333"
+      },
+      "details": {
+        "n_multiplier": "incorrect",
+        "min_payout": "correct",
+        "byte_order": "incorrect",
+        "port": "incorrect"
+      },
+      "score": 0.25,
+      "correct": 1,
+      "total": 4,
+      "response": "1. 1",
+      "status": "FAIL"
+    }
+  ]
+}

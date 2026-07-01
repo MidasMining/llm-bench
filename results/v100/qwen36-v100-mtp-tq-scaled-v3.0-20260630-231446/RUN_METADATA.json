@@ -1,0 +1,27 @@
+{
+  "bench_version": "3.0",
+  "run_name": "qwen36-v100-mtp-tq-scaled",
+  "created_at": "2026-06-30T23:25:16",
+  "model": "Qwen3.6-V100",
+  "api_url": "http://192.168.1.60:8100/v1",
+  "hardware": "V100 PG503 32GB SM70 (H12D-10, EPYC 32c/64t / 125GB)",
+  "backend": "vLLM 0.1.dev15586 test-vibha-wht + Qwen3_5MoeMTP + tq-t3nc (turboquant_attn.py patched for graph-safe .item())",
+  "driver": "550.142 + CUDA-compat 570.86.10",
+  "host": "H12D-8D",
+  "notes": "MTP+TQ scaled to baseline shape: max-num-seqs=64, max-model-len=32768, gpu-mem-util=0.90, speculative-config mtp num_spec_tokens=1. KV=122496 (8.43x at 32K/req). Directly comparable to Config B baseline commit 9bc0a48.",
+  "command": "run_all.py --run-name qwen36-v100-mtp-tq-scaled --model Qwen3.6-V100 --api-url http://192.168.1.60:8100/v1 --hardware V100 PG503 32GB SM70 (H12D-10, EPYC 32c/64t / 125GB) --backend vLLM 0.1.dev15586 test-vibha-wht + Qwen3_5MoeMTP + tq-t3nc (turboquant_attn.py patched for graph-safe .item()) --driver 550.142 + CUDA-compat 570.86.10 --notes MTP+TQ scaled to baseline shape: max-num-seqs=64, max-model-len=32768, gpu-mem-util=0.90, speculative-config mtp num_spec_tokens=1. KV=122496 (8.43x at 32K/req). Directly comparable to Config B baseline commit 9bc0a48. --parallel-levels 1,2,4,8,16 --context-size 32000 --results-base results/v100 --continue-on-error --report",
+  "tools": {
+    "quality": "compare_models.py",
+    "decode": "decode_rate_bench.py v2.0",
+    "parallel": "parallel_benchmark.py v2.0",
+    "context": "long_context_test.py"
+  },
+  "legs_run": [
+    "quality",
+    "decode",
+    "parallel"
+  ],
+  "legs_skipped": [
+    "context (failed)"
+  ]
+}
