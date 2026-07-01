@@ -1,0 +1,26 @@
+{
+  "bench_version": "3.0",
+  "run_name": "qwen36-v100-mtp-pilot-8k",
+  "created_at": "2026-06-30T22:23:47",
+  "model": "Qwen3.6-V100",
+  "api_url": "http://192.168.1.60:8100/v1",
+  "hardware": "V100 PG503 32GB SM70 (H12D-10, EPYC 32c/64t / 125GB)",
+  "backend": "vLLM 0.1.dev15586 test-vibha-wht + Qwen3_5MoeMTP + fp16 KV",
+  "driver": "550.142 + CUDA-compat 570.86.10",
+  "host": "H12D-8D",
+  "notes": "MTP pilot: cyankiwi compressed-tensors INT4 (MTP heads preserved), speculative-config mtp num_spec_tokens=1, max-model-len=8192, max-num-seqs=4, fp16 KV (NOT tq-t3nc \u2014 untested combo)",
+  "command": "run_all.py --run-name qwen36-v100-mtp-pilot-8k --model Qwen3.6-V100 --api-url http://192.168.1.60:8100/v1 --hardware V100 PG503 32GB SM70 (H12D-10, EPYC 32c/64t / 125GB) --backend vLLM 0.1.dev15586 test-vibha-wht + Qwen3_5MoeMTP + fp16 KV --driver 550.142 + CUDA-compat 570.86.10 --notes MTP pilot: cyankiwi compressed-tensors INT4 (MTP heads preserved), speculative-config mtp num_spec_tokens=1, max-model-len=8192, max-num-seqs=4, fp16 KV (NOT tq-t3nc \u2014 untested combo) --parallel-levels 1,2,4 --context-size 8000 --results-base results/v100 --continue-on-error --report",
+  "tools": {
+    "quality": "compare_models.py",
+    "decode": "decode_rate_bench.py v2.0",
+    "parallel": "parallel_benchmark.py v2.0",
+    "context": "long_context_test.py"
+  },
+  "legs_run": [
+    "quality",
+    "decode",
+    "parallel",
+    "context"
+  ],
+  "legs_skipped": []
+}

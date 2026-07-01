@@ -1,0 +1,73 @@
+{
+  "version": "2.0",
+  "benchmark": "parallel",
+  "model": "Qwen3.6-V100",
+  "api_url": "http://192.168.1.60:8100/v1",
+  "timestamp": "20260630_222320",
+  "notes": {
+    "throughput_metric": "completion_tokens_only",
+    "description": "Throughput based on output (completion) tokens / wall time. Prompt tokens excluded. TTFT measured via streaming."
+  },
+  "sequential": {
+    "throughput_toks": 64.8,
+    "avg_latency_s": 6.337,
+    "avg_ttft_s": 0.0,
+    "completion_tokens": 2464,
+    "total_time_s": 38.026
+  },
+  "parallel": [
+    {
+      "concurrency": 1,
+      "throughput_toks": 64.36,
+      "per_request_toks": 64.36,
+      "avg_latency_s": 0.497,
+      "p50_latency_s": 0.497,
+      "p95_latency_s": 0.497,
+      "avg_ttft_s": 0.1196,
+      "p50_ttft_s": 0.1196,
+      "successful": 1,
+      "failed": 0
+    },
+    {
+      "concurrency": 2,
+      "throughput_toks": 82.91,
+      "per_request_toks": 41.46,
+      "avg_latency_s": 1.283,
+      "p50_latency_s": 1.283,
+      "p95_latency_s": 1.929,
+      "avg_ttft_s": 0.1564,
+      "p50_ttft_s": 0.1564,
+      "successful": 2,
+      "failed": 0
+    },
+    {
+      "concurrency": 4,
+      "throughput_toks": 90.44,
+      "per_request_toks": 22.61,
+      "avg_latency_s": 7.956,
+      "p50_latency_s": 7.434,
+      "p95_latency_s": 15.92,
+      "avg_ttft_s": 0.428,
+      "p50_ttft_s": 0.4377,
+      "successful": 4,
+      "failed": 0
+    },
+    {
+      "concurrency": 64,
+      "throughput_toks": 123.52,
+      "per_request_toks": 1.93,
+      "avg_latency_s": 106.063,
+      "p50_latency_s": 107.178,
+      "p95_latency_s": 196.292,
+      "avg_ttft_s": 93.602,
+      "p50_ttft_s": 93.0812,
+      "successful": 64,
+      "failed": 0
+    }
+  ],
+  "peak": {
+    "concurrency": 64,
+    "throughput_toks": 123.52,
+    "speedup_vs_sequential": 1.91
+  }
+}
