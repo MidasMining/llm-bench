@@ -1,0 +1,26 @@
+{
+  "bench_version": "3.0",
+  "run_name": "qwen36-v100-configB-32k",
+  "created_at": "2026-06-30T21:24:03",
+  "model": "Qwen3.6-V100",
+  "api_url": "http://192.168.1.60:8100/v1",
+  "hardware": "V100 PG503 32GB SM70 (H12D-10, EPYC 32c/64t / 125GB)",
+  "backend": "vLLM 0.1.dev15586 test-vibha-wht + TQ tq-t3nc + FLASH_ATTN_V100 + SM70 TurboMind GEMM",
+  "driver": "550.142 + CUDA-compat 570.86.10",
+  "host": "H12D-8D",
+  "notes": "Config B: max-model-len=32768 max-num-seqs=64 gpu-mem-util=0.90; KV=121568 tokens (10.82x at 32K/req)",
+  "command": "run_all.py --run-name qwen36-v100-configB-32k --model Qwen3.6-V100 --api-url http://192.168.1.60:8100/v1 --hardware V100 PG503 32GB SM70 (H12D-10, EPYC 32c/64t / 125GB) --backend vLLM 0.1.dev15586 test-vibha-wht + TQ tq-t3nc + FLASH_ATTN_V100 + SM70 TurboMind GEMM --driver 550.142 + CUDA-compat 570.86.10 --notes Config B: max-model-len=32768 max-num-seqs=64 gpu-mem-util=0.90; KV=121568 tokens (10.82x at 32K/req) --parallel-levels 1,2,4,8,16 --results-base results/v100 --continue-on-error --report",
+  "tools": {
+    "quality": "compare_models.py",
+    "decode": "decode_rate_bench.py v2.0",
+    "parallel": "parallel_benchmark.py v2.0",
+    "context": "long_context_test.py"
+  },
+  "legs_run": [
+    "quality",
+    "decode",
+    "parallel",
+    "context"
+  ],
+  "legs_skipped": []
+}

@@ -1,0 +1,60 @@
+{
+  "context_size": 32000,
+  "model": "Qwen3.6-V100",
+  "overall": "PASS",
+  "tests": [
+    {
+      "test": "needle_in_haystack",
+      "context_tokens": 32000,
+      "needle_position": 64931,
+      "expected": "UA69VG18",
+      "response": "UA69VG18",
+      "found": true,
+      "status": "PASS"
+    },
+    {
+      "test": "multi_file_understanding",
+      "context_tokens": 32000,
+      "expected_concepts": [
+        "handle_submit",
+        "validate_share",
+        "submit_block",
+        "process_block",
+        "pplns",
+        "payout"
+      ],
+      "found_concepts": [
+        "handle_submit",
+        "validate_share",
+        "submit_block",
+        "process_block",
+        "pplns",
+        "payout"
+      ],
+      "score": 1.0,
+      "response": "Here is the step-by-step flow when a miner submits a share that results in a valid block:\n\n1.  **Share Submission & Validation (`thought_pool.py`)**\n    *   `StratumServer.handle_submit()` is called with the worker ID, job ID, and nonce.\n    *   It verifies the job ID matches the current job.\n    *   It calls `BlockManager.validate_share()` to check if the share is valid and if it constitutes a block.\n\n2.  **Block Validation (`block_manager.py`)**\n    *   `BlockManager.validate_share()` builds t",
+      "status": "PASS"
+    },
+    {
+      "test": "cross_reference",
+      "context_tokens": 32000,
+      "expected": {
+        "n_multiplier": "2.0",
+        "min_payout": "1.0",
+        "byte_order": "yes",
+        "port": "3333"
+      },
+      "details": {
+        "n_multiplier": "correct",
+        "min_payout": "correct",
+        "byte_order": "correct",
+        "port": "correct"
+      },
+      "score": 1.0,
+      "correct": 4,
+      "total": 4,
+      "response": "1. 2.0\n2. 1.0\n3. yes\n4. 3333",
+      "status": "PASS"
+    }
+  ]
+}
